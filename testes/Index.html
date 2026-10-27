@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= nomeSistema ?></title>
+  <?!= incluir_('Estilos') ?>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="menu-raiz"></div>
+  <div id="gaveta-raiz"></div>
+  <div id="modal-raiz"></div>
+  <div id="avisos" role="status" aria-live="polite"></div>
+  <script>window.PRISMA_INICIAL = { quadro: <?!= JSON.stringify(quadroInicial) ?> };</script>
+  <?!= incluir_('Script') ?>
+</body>
+</html>
