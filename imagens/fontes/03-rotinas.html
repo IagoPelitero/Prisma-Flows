@@ -1,0 +1,43 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1600px;height:900px;overflow:hidden;font-family:'Inter',system-ui,sans-serif;color:#162033;background:#EEF0F5;position:relative;-webkit-font-smoothing:antialiased}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(900px 600px at 8% 0%, rgba(110,75,216,.13), transparent 60%),
+ radial-gradient(900px 600px at 100% 100%, rgba(221,101,25,.12), transparent 60%),#EEF0F5}
+.faixa{position:absolute;left:0;right:0;bottom:0;height:10px;background:linear-gradient(90deg,#6E4BD8,#3B5BDB,#1785BD,#1F9467,#C49000,#DD6519,#D23B3B)}
+.marca{position:absolute;left:72px;top:56px;display:flex;align-items:center;gap:12px;font-weight:700;font-size:26px;letter-spacing:-.01em}
+.marca small{font-weight:500;color:#5F6B80;font-size:15px;margin-left:6px;padding-left:14px;border-left:1.5px solid #C5CCD8}
+.txt{position:absolute;left:72px;top:180px;width:560px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:99px;background:#fff;border:1px solid #D3D9E2;font-size:15px;font-weight:600;color:#2B44C4;margin-bottom:26px}
+.chip i{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,#6E4BD8,#D23B3B)}
+h1{font-size:60px;line-height:1.04;letter-spacing:-.03em;font-weight:800}
+h1 em{font-style:normal;background:linear-gradient(90deg,#6E4BD8,#3B5BDB 40%,#1785BD);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin-top:26px;font-size:23px;line-height:1.45;color:#4C586C;font-weight:450}
+.pts{margin-top:34px;display:flex;flex-direction:column;gap:14px}
+.pts div{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:600;color:#162033}
+.pts b{width:26px;height:26px;border-radius:8px;background:#E2F3E9;color:#1B7A4B;display:grid;place-items:center;font-size:15px}
+.cena{position:absolute;left:690px;top:70px;width:850px;height:760px;display:flex;flex-direction:column;justify-content:center}
+.cena>.card.fill{flex:1}
+.card{background:#fff;border:1px solid #D3D9E2;border-radius:18px;box-shadow:0 30px 60px -24px rgba(22,32,51,.35),0 2px 6px rgba(22,32,51,.08)}
+.av{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;color:#fff;font-size:11.5px;font-weight:700;border:2px solid #fff;flex:none}
+.av.p{width:26px;height:26px;font-size:9.5px}
+.av + .av{margin-left:-3px}
+.etq{display:inline-block;height:9px;width:38px;border-radius:5px}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:700}
+.alta{background:#FFF2D2;color:#855700}.urg{background:#FBE9E9;color:#B42828}.ok{background:#E2F3E9;color:#1B7A4B}.az{background:#E8ECFB;color:#2B44C4}.cz{background:#EEF0F5;color:#4C586C}
+.btn{display:inline-block;padding:9px 18px;border-radius:10px;font-weight:700;font-size:14px}
+.pri{background:#2B44C4;color:#fff}.sut{background:#EEF0F5;color:#162033;border:1px solid #D3D9E2}
+</style><body>
+<div class="bg"></div><div class="faixa"></div>
+<div class="marca"><svg width="38" height="32" viewBox="0 0 38 32"><path d="M2 17 13 15.5" stroke="#162033" stroke-width="2.4" stroke-linecap="round"/><path d="M18 3 31 27H5Z" fill="#fff" stroke="#162033" stroke-width="2.4" stroke-linejoin="round"/><path d="M24 14l11-6M25.5 18l11-1.5M27 22l10 4" stroke-width="2.6" stroke-linecap="round" fill="none"/><path d="M24 14l11-6" stroke="#6E4BD8"/><path d="M25.5 18l11-1.5" stroke="#1785BD"/><path d="M27 22l10 4" stroke="#D23B3B"/></svg>Prisma Flows<small>Pelitero Labs</small></div>
+<div class="txt"><div class="chip"><i></i>Rotinas</div><h1>O que se repete <em>nasce sozinho</em></h1><p class="sub">Cadastre uma vez. No dia certo o cartão aparece com responsável, prazo e checklist.</p><div class="pts"><div><b>✓</b>Diária, dias úteis, semanal ou mensal</div><div><b>✓</b>Nunca cria o mesmo cartão duas vezes</div><div><b>✓</b>Responsável fixo ou na vez da escala</div></div></div>
+<div class="cena"><div style="display:flex;gap:22px;align-items:center">
+<div class="card" style="flex:1.05;padding:22px;display:flex;flex-direction:column;gap:11px"><div style="font-size:13px;font-weight:700;color:#5F6B80;letter-spacing:.06em;margin-bottom:2px">ROTINAS</div>
+<div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid #D3D9E2;border-radius:12px;background:#fff"><span style="width:34px;height:34px;border-radius:10px;background:#E8ECFB;color:#2B44C4;display:grid;place-items:center;font-size:17px">⟳</span><div style="flex:1"><b style="font-size:15.5px">Atualizar painel de vendas — {mes}</b><div style="font-size:13.5px;color:#5F6B80;margin-top:2px">Dias úteis · responsável fixo</div></div><span class="tag ok">Ativa</span></div><div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid #D3D9E2;border-radius:12px;background:#fff"><span style="width:34px;height:34px;border-radius:10px;background:#E8ECFB;color:#2B44C4;display:grid;place-items:center;font-size:17px">⟳</span><div style="flex:1"><b style="font-size:15.5px">Fechamento do mês</b><div style="font-size:13.5px;color:#5F6B80;margin-top:2px">Mensal · último dia útil</div></div><span class="tag ok">Ativa</span></div><div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid #D3D9E2;border-radius:12px;background:#fff"><span style="width:34px;height:34px;border-radius:10px;background:#E8ECFB;color:#2B44C4;display:grid;place-items:center;font-size:17px">⟳</span><div style="flex:1"><b style="font-size:15.5px">Reunião de alinhamento</b><div style="font-size:13.5px;color:#5F6B80;margin-top:2px">Semanal · terça e quinta</div></div><span class="tag ok">Ativa</span></div><div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid #D3D9E2;border-radius:12px;background:#fff"><span style="width:34px;height:34px;border-radius:10px;background:#E8ECFB;color:#2B44C4;display:grid;place-items:center;font-size:17px">⟳</span><div style="flex:1"><b style="font-size:15.5px">Conferir pendências da regional</b><div style="font-size:13.5px;color:#5F6B80;margin-top:2px">Diária · na vez da escala</div></div><span class="tag ok">Ativa</span></div><div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border:1px solid #D3D9E2;border-radius:12px;background:#fff"><span style="width:34px;height:34px;border-radius:10px;background:#E8ECFB;color:#2B44C4;display:grid;place-items:center;font-size:17px">⟳</span><div style="flex:1"><b style="font-size:15.5px">Relatório de férias</b><div style="font-size:13.5px;color:#5F6B80;margin-top:2px">Mensal · dia 20</div></div><span class="tag cz">Pausada</span></div>
+<div class="btn pri" style="align-self:flex-start;margin-top:6px">Ligar criação diária</div></div>
+<div style="font-size:34px;color:#6E4BD8;font-weight:800">➜</div>
+<div class="card" style="flex:.95;padding:20px;border-top:5px solid #3B5BDB"><div style="display:flex;gap:6px;margin-bottom:10px"><span class="etq" style="background:#3B5BDB"></span><span class="etq" style="background:#1F9467"></span></div><b style="font-size:19px;line-height:1.25">Atualizar painel de vendas — 10/2026</b>
+<div style="display:flex;gap:7px;margin:12px 0 14px"><span class="tag cz">📅 Prazo em 2 dias</span><span class="tag az">⟳ Rotina</span></div>
+<div style="font-size:14px;color:#4C586C;margin-bottom:12px">Onde fazer: planilha de vendas, pasta Painel.</div>
+<div style="display:flex;flex-direction:column;gap:9px;font-size:15px;font-weight:550"><div style="display:flex;gap:10px;align-items:center"><span style="width:20px;height:20px;border-radius:6px;border:2px solid #B5BECC"></span>Baixar relatório</div><div style="display:flex;gap:10px;align-items:center"><span style="width:20px;height:20px;border-radius:6px;border:2px solid #B5BECC"></span>Atualizar abas</div><div style="display:flex;gap:10px;align-items:center"><span style="width:20px;height:20px;border-radius:6px;border:2px solid #B5BECC"></span>Conferir totais</div><div style="display:flex;gap:10px;align-items:center"><span style="width:20px;height:20px;border-radius:6px;border:2px solid #B5BECC"></span>Avisar a coordenação</div></div>
+<div style="margin-top:16px;display:flex;align-items:center;gap:8px;font-size:13px;color:#5F6B80"><span class="av p" style="background:#6E4BD8" title="Ana Souza">AS</span> Ana Souza · criado hoje às 06:00 por Rotinas</div></div></div></div></body></html>
