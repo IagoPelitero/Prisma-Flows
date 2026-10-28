@@ -13,7 +13,7 @@
  * - Toda gravação passa por LockService para duas pessoas não pisarem uma na outra.
  */
 
-const SCHEMA_VERSION = '1.3.0';
+const SCHEMA_VERSION = '1.4.0';
 
 const ABAS = {
   QUADROS: {
@@ -23,7 +23,15 @@ const ABAS = {
   },
   LISTAS: {
     nome: 'Listas', prefixo: 'LS',
-    colunas: ['ID', 'Quadro_ID', 'Nome', 'Ordem', 'Limite_WIP', 'Ativo', 'Criado_em', 'Criado_por', 'Frente', 'Frente_Vagas']
+    colunas: ['ID', 'Quadro_ID', 'Nome', 'Ordem', 'Limite_WIP', 'Ativo', 'Criado_em', 'Criado_por', 'Frente', 'Frente_Vagas', 'Tipo']
+  },
+  ROTATIVA: {
+    nome: 'Rotativa', prefixo: 'RV',
+    colunas: ['ID', 'Lista_ID', 'Tarefa', 'Texto', 'Ordem', 'Pessoas', 'Modo', 'Semana_Base', 'Indice_Base', 'Trocas', 'Ativo', 'Criado_em', 'Criado_por', 'Atualizado_em']
+  },
+  RECORRENTE: {
+    nome: 'Recorrente', prefixo: 'RC',
+    colunas: ['ID', 'Lista_ID', 'Pessoa', 'Texto', 'Ordem', 'Atendimentos', 'Ultimo_em', 'Ultimo_por', 'Ativo', 'Criado_em', 'Criado_por']
   },
   CARTOES: {
     nome: 'Cartoes', prefixo: 'CT',
@@ -103,10 +111,11 @@ const CONFIG_PADRAO = [
 
 const PERFIS = ['ADM', 'Membro', 'Leitor'];
 const LIMITE_CARROSSEL = 60;
+const TIPOS_LISTA = ['Normal', 'Rotativa', 'Recorrente'];
 const TURNOS_ALMOCO_PADRAO = ['11:30', '12:00', '12:30', '13:00'];
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente'];
 const COR_QUADRO_PADRAO = '#3B5BDB';
-const FORMATO_DATA = { Prazo: 'dd/mm/yyyy', Semana: 'dd/mm/yyyy', Inicio: 'dd/mm/yyyy', Fim: 'dd/mm/yyyy', Ultima_Geracao: 'dd/mm/yyyy', Rotina_Data: 'dd/mm/yyyy', Data: 'dd/mm/yyyy' };
+const FORMATO_DATA = { Prazo: 'dd/mm/yyyy', Semana: 'dd/mm/yyyy', Inicio: 'dd/mm/yyyy', Fim: 'dd/mm/yyyy', Ultima_Geracao: 'dd/mm/yyyy', Rotina_Data: 'dd/mm/yyyy', Data: 'dd/mm/yyyy', Semana_Base: 'dd/mm/yyyy' };
 const FORMATO_DATA_HORA = 'dd/mm/yyyy hh:mm';
 const LIMITE_LOG_LEITURA = 4000;
 const MOTIVOS_AUSENCIA = ['Folga', 'Férias', 'Treinamento', 'Outro'];
@@ -256,9 +265,24 @@ function obterQuadro(quadroId) {
     .filter(function (e) { return e.Quadro_ID === q.ID && ativo_(e.Ativo); })
     .map(etiquetaParaCliente_);
 
+  const rotativas = {};
+  const recorrentes = {};
+  const listasRot = listas.filter(function (l) { return tipoLista_(l) === 'Rotativa'; });
+  const listasRec = listas.filter(function (l) { return tipoLista_(l) === 'Recorrente'; });
+  if (listasRot.length) {
+    const tr = lerTabela_('ROTATIVA');
+    listasRot.forEach(function (l) { rotativas[l.ID] = tarefasDaLista_(tr, l.ID).map(tarefaParaCliente_); });
+  }
+  if (listasRec.length) {
+    const tcr = lerTabela_('RECORRENTE');
+    listasRec.forEach(function (l) { recorrentes[l.ID] = filaDaLista_(tcr, l.ID).map(function (r) { return participanteParaCliente_(r, tz); }); });
+  }
+
   return {
     quadro: quadroParaCliente_(q),
     listas: listas.map(listaParaCliente_),
+    rotativas: rotativas,
+    recorrentes: recorrentes,
     cartoes: cartoes,
     etiquetas: etiquetas,
     checklists: checklists,
@@ -362,10 +386,11 @@ function listarQuadrosArquivados() {
  * API — LISTAS
  * ========================================================================= */
 
-function criarLista(quadroId, nome) {
+function criarLista(quadroId, nome, tipo) {
   const u = usuarioAtual_();
   const limpo = textoLimpo_(nome, 80);
   if (!limpo) throw new Error('Dê um nome para a lista.');
+  const tipoLimpo = TIPOS_LISTA.filter(function (t) { return normalizar_(t) === normalizar_(tipo); })[0] || 'Normal';
   return comTrava_(function () {
     const q = exigirQuadroEditavel_(u, quadroId);
     const tl = lerTabela_('LISTAS');
@@ -373,9 +398,9 @@ function criarLista(quadroId, nome) {
     const maior = irmas.reduce(function (m, l) { return Math.max(m, numOrdem_(l)); }, 0);
     const l = inserir_(tl, {
       ID: proximoId_(tl), Quadro_ID: q.ID, Nome: textoSeguro_(limpo), Ordem: Math.min(maior, 1e8) + 1000,
-      Limite_WIP: '', Ativo: 'Sim', Criado_em: new Date(), Criado_por: u.nome
+      Limite_WIP: '', Ativo: 'Sim', Criado_em: new Date(), Criado_por: u.nome, Tipo: tipoLimpo === 'Normal' ? '' : tipoLimpo
     });
-    registrar_(u, 'Criou lista', 'Lista', l.ID, q.ID, limpo);
+    registrar_(u, 'Criou lista', 'Lista', l.ID, q.ID, limpo + (tipoLimpo === 'Normal' ? '' : ' (' + tipoLimpo + ')'));
     return resposta_(q.ID, { lista: listaParaCliente_(l) });
   });
 }
@@ -450,6 +475,7 @@ function criarCartao(listaId, titulo) {
   return comTrava_(function () {
     const l = acharPorId_(lerTabela_('LISTAS'), listaId);
     if (!l || !ativo_(l.Ativo)) throw new Error('Lista não encontrada.');
+    if (!listaAceitaCartoes_(l)) throw new Error('Esta lista é de rodízio e não recebe cartões.');
     const q = exigirQuadroEditavel_(u, l.Quadro_ID);
     const tc = lerTabela_('CARTOES');
     const maior = tc.linhas
@@ -547,6 +573,7 @@ function moverCartao(cartaoId, listaDestinoId, proximoId) {
     const ctx = contextoCartao_(u, c);
     const destino = ctx.listas.filter(function (l) { return l.ID === listaDestinoId && ativo_(l.Ativo); })[0];
     if (!destino) throw new Error('A lista de destino não existe mais neste quadro.');
+    if (!listaAceitaCartoes_(destino)) throw new Error('Esta lista é de rodízio e não recebe cartões.');
 
     const irmaos = cartoesDoQuadro_(tc, ctx.quadro.ID, ctx.listas)
       .filter(function (x) { return x.lista && x.lista.ID === destino.ID && ativo_(x.c.Ativo) && x.c.ID !== c.ID; })
@@ -580,7 +607,7 @@ function arquivarCartao(cartaoId, arquivar) {
     const campos = { Ativo: arquivar === false ? 'Sim' : 'Não', Atualizado_em: new Date(), Atualizado_por: u.nome };
     let lista = ctx.lista;
     if (arquivar === false && (!lista || !ativo_(lista.Ativo))) {
-      lista = ctx.listas.filter(function (l) { return ativo_(l.Ativo); }).sort(porOrdem_)[0];
+      lista = ctx.listas.filter(function (l) { return ativo_(l.Ativo) && listaAceitaCartoes_(l); }).sort(porOrdem_)[0];
       if (!lista) throw new Error('Crie ou restaure uma lista antes de restaurar este cartão.');
       campos.Lista_ID = lista.ID;
     }
@@ -744,7 +771,7 @@ function listarDestinos() {
       return {
         id: q.ID, nome: textoDe_(q.Nome), cor: corValida_(q.Cor) || COR_QUADRO_PADRAO,
         listas: tl.linhas
-          .filter(function (l) { return l.Quadro_ID === q.ID && ativo_(l.Ativo); })
+          .filter(function (l) { return l.Quadro_ID === q.ID && ativo_(l.Ativo) && listaAceitaCartoes_(l); })
           .sort(porOrdem_)
           .map(function (l) { return { id: l.ID, nome: textoDe_(l.Nome) }; })
       };
@@ -768,6 +795,7 @@ function moverCartaoParaQuadro(cartaoId, quadroDestinoId, listaDestinoId) {
     const listasDestino = lerTabela_('LISTAS').linhas.filter(function (l) { return l.Quadro_ID === destino.ID; });
     const lista = listasDestino.filter(function (l) { return l.ID === listaDestinoId && ativo_(l.Ativo); })[0];
     if (!lista) throw new Error('A lista de destino não existe mais.');
+    if (!listaAceitaCartoes_(lista)) throw new Error('Esta lista é de rodízio e não recebe cartões.');
 
     const te = lerTabela_('ETIQUETAS');
     const criadas = [];
@@ -983,6 +1011,307 @@ function reordenarCarrossel(cartaoId, ids, desfazerId) {
     if (volta) gravarCampos_(cx.tcr, volta, { Atendimentos: Math.max(0, numero_(volta.Atendimentos) - 1) });
     registrar_(u, 'Carrossel', 'Cartão', cx.c.ID, cx.ctx.quadro.ID, 'Desfez a passagem de vez');
     return respostaCarrossel_(u, cx);
+  });
+}
+
+/* =========================================================================
+ * API — LISTA DE ROTATIVIDADE SEMANAL
+ * Tarefas que se repetem todo dia útil. Cada tarefa mostra quem cuida dela na semana: os nomes escolhidos giram
+ * a cada segunda (ou ficam fixos) e o nome pode ser trocado a qualquer hora, só naquela semana.
+ * ========================================================================= */
+
+/** Nome de pessoa seguro para ficar numa célula que guarda vários nomes (sem ; , = nem quebra de linha). */
+function nomePessoa_(v) {
+  return textoLimpo_(v, 80).replace(/[;,=]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function modoRotativa_(v) {
+  return normalizar_(v) === 'fixo' ? 'Fixo' : 'Girar';
+}
+
+function tarefasDaLista_(tr, listaId) {
+  return tr.linhas.filter(function (r) { return r.Lista_ID === listaId && ativo_(r.Ativo); }).sort(porOrdem_);
+}
+
+/** 'AAAA-MM-DD=Nome;AAAA-MM-DD=Nome' -> { 'AAAA-MM-DD': 'Nome' } */
+function trocasDe_(r) {
+  const mapa = {};
+  separar_(r.Trocas).forEach(function (par) {
+    const i = par.indexOf('=');
+    if (i > 0) mapa[par.slice(0, i).trim()] = par.slice(i + 1).trim();
+  });
+  return mapa;
+}
+
+function trocasParaTexto_(mapa) {
+  return Object.keys(mapa).sort().filter(function (k) { return mapa[k]; }).map(function (k) { return k + '=' + mapa[k]; }).join(';');
+}
+
+/** Quem cuida da tarefa na semana que começa na segunda `semana`: a troca, se houver; senão o rodízio. */
+function responsavelDaSemana_(r, semana) {
+  const pessoas = separar_(r.Pessoas);
+  let doRodizio = '';
+  if (pessoas.length) {
+    const base = dataIso_(r.Semana_Base, fuso_()) || semana;
+    const idx = parseInt(r.Indice_Base, 10) || 0;
+    const passos = modoRotativa_(r.Modo) === 'Fixo' ? 0 : Math.round(diasEntre_(base, semana) / 7);
+    doRodizio = pessoas[(((idx + passos) % pessoas.length) + pessoas.length) % pessoas.length];
+  }
+  const troca = trocasDe_(r)[semana] || '';
+  return { semana: semana, pessoa: troca || doRodizio, doRodizio: doRodizio, trocado: !!troca && normalizar_(troca) !== normalizar_(doRodizio) };
+}
+
+function tarefaParaCliente_(r) {
+  const atual = segundaDe_(hojeIso_());
+  return {
+    id: r.ID, listaId: r.Lista_ID, tarefa: textoDe_(r.Tarefa), texto: textoDe_(r.Texto), ordem: numOrdem_(r),
+    pessoas: separar_(r.Pessoas), modo: modoRotativa_(r.Modo),
+    atual: responsavelDaSemana_(r, atual), proxima: responsavelDaSemana_(r, somarDiasIso_(atual, 7))
+  };
+}
+
+function contextoListaTipo_(u, listaId, tipo) {
+  const l = acharPorId_(lerTabela_('LISTAS'), listaId);
+  if (!l || !ativo_(l.Ativo)) throw new Error('Lista não encontrada.');
+  if (tipoLista_(l) !== tipo) throw new Error(tipo === 'Rotativa' ? 'Esta lista não é de rotatividade semanal.' : 'Esta lista não é recorrente.');
+  const q = exigirQuadroEditavel_(u, l.Quadro_ID);
+  return { l: l, q: q };
+}
+
+function respostaRotativa_(q, tr, listaId, extra) {
+  const r = extra || {};
+  r.listaId = listaId;
+  r.tarefas = tarefasDaLista_(tr, listaId).map(tarefaParaCliente_);
+  return resposta_(q.ID, r);
+}
+
+/** Cria ou edita uma tarefa. dados: { id?, tarefa, texto, pessoas[], modo: 'Girar'|'Fixo', inicio } (inicio = quem cuida dela nesta semana). */
+function salvarTarefaRotativa(listaId, dados) {
+  const u = usuarioAtual_();
+  dados = dados || {};
+  return comTrava_(function () {
+    const cx = contextoListaTipo_(u, listaId, 'Rotativa');
+    const tr = lerTabela_('ROTATIVA');
+    const existente = dados.id ? acharPorId_(tr, dados.id) : null;
+    if (dados.id && (!existente || existente.Lista_ID !== cx.l.ID || !ativo_(existente.Ativo))) throw new Error('Tarefa não encontrada.');
+    const tarefa = textoLimpo_(dados.tarefa, 120);
+    if (!tarefa) throw new Error('Dê um nome para a tarefa.');
+    const pessoas = unicos_((Array.isArray(dados.pessoas) ? dados.pessoas : separar_(dados.pessoas)).map(nomePessoa_).filter(String));
+    if (!pessoas.length) throw new Error('Escolha pelo menos uma pessoa para a tarefa.');
+    if (pessoas.length > LIMITE_CARROSSEL) throw new Error('A tarefa aceita até ' + LIMITE_CARROSSEL + ' pessoas.');
+    const modo = modoRotativa_(dados.modo);
+    const i0 = pessoas.map(normalizar_).indexOf(normalizar_(nomePessoa_(dados.inicio)));
+    const semana = segundaDe_(hojeIso_());
+    const tz = fuso_();
+    const campos = {
+      Tarefa: textoSeguro_(tarefa), Texto: textoSeguro_(textoLimpo_(dados.texto, 300)), Pessoas: textoSeguro_(pessoas.join('; ')), Modo: modo,
+      Semana_Base: Utilities.parseDate(semana, tz, 'yyyy-MM-dd'), Indice_Base: i0 === -1 ? 0 : i0, Atualizado_em: new Date()
+    };
+    let r;
+    if (existente) {
+      // Quem a pessoa escolheu como responsável desta semana vale mais que uma troca antiga; trocas de semanas futuras ficam.
+      const t = trocasDe_(existente);
+      Object.keys(t).forEach(function (k) { if (k <= semana) delete t[k]; });
+      campos.Trocas = textoSeguro_(trocasParaTexto_(t));
+      gravarCampos_(tr, existente, campos);
+      r = existente;
+    } else {
+      const maior = tarefasDaLista_(tr, cx.l.ID).reduce(function (m, x) { return Math.max(m, numOrdem_(x)); }, 0);
+      campos.ID = proximoId_(tr); campos.Lista_ID = cx.l.ID; campos.Ordem = Math.min(maior, 1e8) + 1000; campos.Trocas = '';
+      campos.Ativo = 'Sim'; campos.Criado_em = new Date(); campos.Criado_por = u.nome;
+      r = inserir_(tr, campos);
+    }
+    registrar_(u, existente ? 'Editou tarefa rotativa' : 'Criou tarefa rotativa', 'Lista', r.ID, cx.q.ID, tarefa + ' (' + modo + '): ' + pessoas.join(', '));
+    return respostaRotativa_(cx.q, tr, cx.l.ID, { tarefaId: r.ID });
+  });
+}
+
+function removerTarefaRotativa(tarefaId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const tr = lerTabela_('ROTATIVA');
+    const r = acharPorId_(tr, tarefaId);
+    if (!r || !ativo_(r.Ativo)) throw new Error('Tarefa não encontrada.');
+    const cx = contextoListaTipo_(u, r.Lista_ID, 'Rotativa');
+    gravarCampos_(tr, r, { Ativo: 'Não', Atualizado_em: new Date() });
+    registrar_(u, 'Removeu tarefa rotativa', 'Lista', r.ID, cx.q.ID, textoDe_(r.Tarefa));
+    return respostaRotativa_(cx.q, tr, cx.l.ID);
+  });
+}
+
+/** Troca quem cuida da tarefa só naquela semana ('atual' ou 'proxima'). Pessoa vazia volta ao rodízio. */
+function trocarResponsavelRotativa(tarefaId, qual, pessoa) {
+  const u = usuarioAtual_();
+  const nome = nomePessoa_(pessoa);
+  return comTrava_(function () {
+    const tr = lerTabela_('ROTATIVA');
+    const r = acharPorId_(tr, tarefaId);
+    if (!r || !ativo_(r.Ativo)) throw new Error('Tarefa não encontrada.');
+    const cx = contextoListaTipo_(u, r.Lista_ID, 'Rotativa');
+    const atual = segundaDe_(hojeIso_());
+    const semana = qual === 'proxima' ? somarDiasIso_(atual, 7) : atual;
+    const t = trocasDe_(r);
+    Object.keys(t).forEach(function (k) { if (k < atual) delete t[k]; });
+    // trocar para o mesmo nome que o rodízio já indica não é uma troca: não guarda
+    const semTroca = Object.assign({}, r, { Trocas: '' });
+    if (nome && normalizar_(nome) !== normalizar_(responsavelDaSemana_(semTroca, semana).pessoa)) t[semana] = nome; else delete t[semana];
+    gravarCampos_(tr, r, { Trocas: textoSeguro_(trocasParaTexto_(t)), Atualizado_em: new Date() });
+    registrar_(u, 'Trocou responsável', 'Lista', r.ID, cx.q.ID, textoDe_(r.Tarefa) + ' em ' + semana.split('-').reverse().join('/') + ': ' + (nome || 'voltou ao rodízio'));
+    return respostaRotativa_(cx.q, tr, cx.l.ID);
+  });
+}
+
+/* =========================================================================
+ * API — LISTA RECORRENTE (fila de pessoas com "Atendi", em formato de lista)
+ * O primeiro da fila é a pessoa da vez. Ao marcar "Atendi", ela vai para o fim da fila.
+ * ========================================================================= */
+
+function filaDaLista_(tcr, listaId) {
+  return tcr.linhas.filter(function (r) { return r.Lista_ID === listaId && ativo_(r.Ativo); }).sort(porOrdem_);
+}
+
+function respostaFila_(q, tcr, listaId, extra) {
+  const fila0 = filaDaLista_(tcr, listaId);
+  if (fila0.some(function (r) { return Math.abs(numOrdem_(r)) > 1e6; })) {
+    fila0.forEach(function (r, i) { gravarCampos_(tcr, r, { Ordem: (i + 1) * 1000 }); });
+  }
+  const tz = fuso_();
+  const r = extra || {};
+  r.listaId = listaId;
+  r.itens = filaDaLista_(tcr, listaId).map(function (x) { return participanteParaCliente_(x, tz); });
+  return resposta_(q.ID, r);
+}
+
+function pessoaDaListaRecorrente_(u, itemId) {
+  const tcr = lerTabela_('RECORRENTE');
+  const p = acharPorId_(tcr, itemId);
+  if (!p || !ativo_(p.Ativo)) throw new Error('Pessoa não encontrada na lista.');
+  const cx = contextoListaTipo_(u, p.Lista_ID, 'Recorrente');
+  return { tcr: tcr, p: p, l: cx.l, q: cx.q, fila: filaDaLista_(tcr, cx.l.ID) };
+}
+
+function adicionarPessoaLista(listaId, pessoa, texto) {
+  const u = usuarioAtual_();
+  const nome = nomePessoa_(pessoa);
+  if (!nome) throw new Error('Escreva o nome de quem entra na lista.');
+  return comTrava_(function () {
+    const cx = contextoListaTipo_(u, listaId, 'Recorrente');
+    const tcr = lerTabela_('RECORRENTE');
+    const fila = filaDaLista_(tcr, cx.l.ID);
+    if (fila.length >= LIMITE_CARROSSEL) throw new Error('A lista aceita até ' + LIMITE_CARROSSEL + ' pessoas.');
+    if (fila.some(function (x) { return normalizar_(x.Pessoa) === normalizar_(nome); })) throw new Error(nome + ' já está nesta lista.');
+    const maior = fila.reduce(function (m, x) { return Math.max(m, numOrdem_(x)); }, 0);
+    inserir_(tcr, {
+      ID: proximoId_(tcr), Lista_ID: cx.l.ID, Pessoa: textoSeguro_(nome), Texto: textoSeguro_(textoLimpo_(texto, 300)),
+      Ordem: maior + 1000, Atendimentos: 0, Ativo: 'Sim', Criado_em: new Date(), Criado_por: u.nome
+    });
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Incluiu ' + nome);
+    return respostaFila_(cx.q, tcr, cx.l.ID);
+  });
+}
+
+function adicionarEquipeLista(listaId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = contextoListaTipo_(u, listaId, 'Recorrente');
+    const tcr = lerTabela_('RECORRENTE');
+    const fila = filaDaLista_(tcr, cx.l.ID);
+    const ja = {};
+    fila.forEach(function (x) { ja[normalizar_(x.Pessoa)] = true; });
+    const novos = ordenarNomes_(candidatosEscala_(cx.q)).filter(function (n) { return !ja[normalizar_(n)]; });
+    const lote = novos.slice(0, Math.max(0, LIMITE_CARROSSEL - fila.length));
+    if (!lote.length) throw new Error(novos.length ? 'A lista já está cheia.' : 'Todos do quadro já estão na lista.');
+    const maior = fila.reduce(function (m, x) { return Math.max(m, numOrdem_(x)); }, 0);
+    const agora = new Date();
+    inserirVarios_(tcr, lote.map(function (n, i) {
+      return {
+        ID: proximoId_(tcr), Lista_ID: cx.l.ID, Pessoa: textoSeguro_(n), Texto: '', Ordem: maior + (i + 1) * 1000,
+        Atendimentos: 0, Ativo: 'Sim', Criado_em: agora, Criado_por: u.nome
+      };
+    }));
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Incluiu a equipe (' + lote.length + ')');
+    return respostaFila_(cx.q, tcr, cx.l.ID, { adicionados: lote.length });
+  });
+}
+
+function atualizarPessoaLista(itemId, dados) {
+  const u = usuarioAtual_();
+  dados = dados || {};
+  return comTrava_(function () {
+    const cx = pessoaDaListaRecorrente_(u, itemId);
+    const campos = {};
+    if (dados.pessoa !== undefined) {
+      const nome = nomePessoa_(dados.pessoa);
+      if (!nome) throw new Error('O nome não pode ficar vazio.');
+      if (cx.fila.some(function (x) { return x.ID !== cx.p.ID && normalizar_(x.Pessoa) === normalizar_(nome); })) throw new Error(nome + ' já está nesta lista.');
+      campos.Pessoa = textoSeguro_(nome);
+    }
+    if (dados.texto !== undefined) campos.Texto = textoSeguro_(textoLimpo_(dados.texto, 300));
+    if (!Object.keys(campos).length) throw new Error('Nada para salvar.');
+    gravarCampos_(cx.tcr, cx.p, campos);
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Editou ' + textoDe_(cx.p.Pessoa));
+    return respostaFila_(cx.q, cx.tcr, cx.l.ID);
+  });
+}
+
+function removerPessoaLista(itemId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = pessoaDaListaRecorrente_(u, itemId);
+    gravarCampos_(cx.tcr, cx.p, { Ativo: 'Não' });
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Tirou ' + textoDe_(cx.p.Pessoa));
+    return respostaFila_(cx.q, cx.tcr, cx.l.ID);
+  });
+}
+
+/** "Atendi": a pessoa vai para o fim da fila e o próximo passa a ser o da vez. */
+function passarVezLista(itemId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = pessoaDaListaRecorrente_(u, itemId);
+    const antes = cx.fila.map(function (x) { return x.ID; });
+    const maior = cx.fila.reduce(function (m, x) { return Math.max(m, numOrdem_(x)); }, 0);
+    const campos = { Atendimentos: numero_(cx.p.Atendimentos) + 1, Ultimo_em: new Date(), Ultimo_por: textoSeguro_(u.nome) };
+    if (cx.fila.length > 1 && cx.fila[cx.fila.length - 1].ID !== cx.p.ID) campos.Ordem = maior + 1000;
+    gravarCampos_(cx.tcr, cx.p, campos);
+    const r = respostaFila_(cx.q, cx.tcr, cx.l.ID, { antes: antes });
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, textoDe_(cx.p.Pessoa) + ' atendeu e foi para o fim; na vez: ' + (r.itens.length ? r.itens[0].pessoa : '-'));
+    return r;
+  });
+}
+
+function colocarNaVezLista(itemId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = pessoaDaListaRecorrente_(u, itemId);
+    if (cx.fila[0] && cx.fila[0].ID !== cx.p.ID) {
+      const menor = cx.fila.reduce(function (m, x) { return Math.min(m, numOrdem_(x)); }, Infinity);
+      gravarCampos_(cx.tcr, cx.p, { Ordem: menor - 1000 });
+    }
+    const r = respostaFila_(cx.q, cx.tcr, cx.l.ID);
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Colocou ' + textoDe_(cx.p.Pessoa) + ' na vez');
+    return r;
+  });
+}
+
+/** Volta a fila para uma ordem anterior (desfazer). Com o ID de quem atendeu, tira esse atendimento da conta. */
+function reordenarLista(listaId, ids, desfazerId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = contextoListaTipo_(u, listaId, 'Recorrente');
+    const tcr = lerTabela_('RECORRENTE');
+    const fila = filaDaLista_(tcr, cx.l.ID);
+    const desejada = (Array.isArray(ids) ? ids : []).map(String);
+    const porId = {};
+    fila.forEach(function (x) { porId[x.ID] = x; });
+    const resto = fila.map(function (x) { return x.ID; }).filter(function (id) { return desejada.indexOf(id) === -1; });
+    desejada.filter(function (id) { return porId[id]; }).concat(resto).forEach(function (id, i) {
+      if (numOrdem_(porId[id]) !== (i + 1) * 1000) gravarCampos_(tcr, porId[id], { Ordem: (i + 1) * 1000 });
+    });
+    const volta = desfazerId ? porId[String(desfazerId)] : null;
+    if (volta) gravarCampos_(tcr, volta, { Atendimentos: Math.max(0, numero_(volta.Atendimentos) - 1) });
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Desfez a passagem de vez');
+    return respostaFila_(cx.q, tcr, cx.l.ID);
   });
 }
 
@@ -1241,7 +1570,7 @@ function salvarConfigEscala(quadroId, dados) {
     });
     const tl = lerTabela_('LISTAS');
     tl.linhas.filter(function (l) { return l.Quadro_ID === q.ID; }).forEach(function (l) {
-      const eFrente = Object.prototype.hasOwnProperty.call(frentes, l.ID) && ativo_(l.Ativo);
+      const eFrente = Object.prototype.hasOwnProperty.call(frentes, l.ID) && ativo_(l.Ativo) && listaAceitaCartoes_(l);
       gravarCampos_(tl, l, { Frente: eFrente ? 'Sim' : 'Não', Frente_Vagas: eFrente ? frentes[l.ID] : '' });
     });
 
@@ -1731,7 +2060,7 @@ function salvarRotina(dados) {
     const q = acharPorId_(tq, dados.quadroId);
     if (!q || !ativo_(q.Ativo)) throw new Error('Escolha o quadro da rotina.');
     if (!podeAdministrar_(u, q)) throw new Error('Só o dono do quadro ou um ADM pode criar rotinas nele.');
-    const lista = tl.linhas.filter(function (l) { return l.ID === dados.listaId && l.Quadro_ID === q.ID && ativo_(l.Ativo); })[0];
+    const lista = tl.linhas.filter(function (l) { return l.ID === dados.listaId && l.Quadro_ID === q.ID && ativo_(l.Ativo) && listaAceitaCartoes_(l); })[0];
     if (!lista) throw new Error('Escolha a lista onde o cartão vai nascer.');
 
     const freq = FREQUENCIAS.filter(function (f) { return normalizar_(f) === normalizar_(dados.frequencia); })[0];
@@ -1963,7 +2292,7 @@ function listarRotinasPara_(u) {
     .map(function (q) {
       return {
         id: q.ID, nome: textoDe_(q.Nome), cor: corValida_(q.Cor) || COR_QUADRO_PADRAO,
-        listas: tl.linhas.filter(function (l) { return l.Quadro_ID === q.ID && ativo_(l.Ativo); }).sort(porOrdem_)
+        listas: tl.linhas.filter(function (l) { return l.Quadro_ID === q.ID && ativo_(l.Ativo) && listaAceitaCartoes_(l); }).sort(porOrdem_)
           .map(function (l) { return { id: l.ID, nome: textoDe_(l.Nome), frente: sim_(l.Frente) }; }),
         etiquetas: te.linhas.filter(function (e) { return e.Quadro_ID === q.ID && ativo_(e.Ativo); }).map(etiquetaParaCliente_)
       };
@@ -3005,7 +3334,7 @@ function resolverLista_(c, listas) {
   const porId = listas.filter(function (l) { return l.ID === c.Lista_ID; })[0];
   if (porId) return porId;
   const alvo = normalizar_(c.Lista_ID);
-  const ativas = listas.filter(function (l) { return ativo_(l.Ativo); }).sort(porOrdem_);
+  const ativas = listas.filter(function (l) { return ativo_(l.Ativo) && listaAceitaCartoes_(l); }).sort(porOrdem_);
   if (alvo) {
     const porNome = ativas.filter(function (l) { return normalizar_(l.Nome) === alvo; })[0];
     if (porNome) return porNome;
@@ -3079,7 +3408,17 @@ function quadroParaCliente_(q) {
 function listaParaCliente_(l) {
   const lim = parseInt(l.Limite_WIP, 10);
   const vagas = parseInt(l.Frente_Vagas, 10);
-  return { id: l.ID, nome: textoDe_(l.Nome), ordem: numOrdem_(l), limite: lim > 0 ? lim : 0, frente: sim_(l.Frente), vagas: vagas > 0 ? vagas : 0 };
+  return { id: l.ID, nome: textoDe_(l.Nome), ordem: numOrdem_(l), limite: lim > 0 ? lim : 0, frente: sim_(l.Frente), vagas: vagas > 0 ? vagas : 0, tipo: tipoLista_(l) };
+}
+
+/** 'Normal' (recebe cartões), 'Rotativa' (rodízio semanal de tarefas) ou 'Recorrente' (fila de pessoas com Atendi). */
+function tipoLista_(l) {
+  const n = normalizar_(l && l.Tipo);
+  return n === 'rotativa' ? 'Rotativa' : (n === 'recorrente' ? 'Recorrente' : 'Normal');
+}
+
+function listaAceitaCartoes_(l) {
+  return tipoLista_(l) === 'Normal';
 }
 
 function etiquetaParaCliente_(e) {

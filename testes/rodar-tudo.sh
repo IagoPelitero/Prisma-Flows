@@ -25,6 +25,7 @@ roda "duplicar cartão"        teste-duplicar-cartao.js
 roda "carrossel"              teste-carrossel.js
 roda "editar a vez"           teste-editar-vez.js
 roda "almoço e home"          teste-almoco-home.js
+roda "listas de rodízio"      teste-listas-rodizio.js
 roda "datas, rotinas, escala" teste-agenda-datas.js
 roda "robustez (fuzz)"        teste-robustez.js SEED=dados-volume.js
 
@@ -34,7 +35,7 @@ SEED=dados-volume.js node simulador.js "$CODIGO" cabecalhos.json medir-velocidad
 if [ "$1" = "navegador" ]; then
   echo; echo "== Navegador =="
   porta=$((8800 + RANDOM % 150))
-  for t in navegador-1-carrossel-vez-almoco navegador-2-funcoes-existentes navegador-3-digitacao-rapida navegador-4-duas-pessoas; do
+  for t in navegador-1-carrossel-vez-almoco navegador-2-funcoes-existentes navegador-3-digitacao-rapida navegador-4-duas-pessoas navegador-5-listas-rodizio; do
     porta=$((porta + 1))
     PORT=$porta LAT=0.2 SEED=dados-navegador.js node simulador.js "$CODIGO" cabecalhos.json x > /tmp/simulador.log 2>&1 &
     pid=$!; sleep 2

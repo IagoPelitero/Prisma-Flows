@@ -750,6 +750,7 @@
   }
 
   function htmlLista(l, i) {
+    if (l.tipo === 'Rotativa' || l.tipo === 'Recorrente') return htmlListaRodizio(l, i);
     var Q = S.quadro;
     var todos = cartoesDaLista(l.id);
     var visiveis = todos.filter(passaFiltro);
@@ -796,6 +797,7 @@
     if (Q.podeEditar) {
       html += '<div class="lista-nova">' + (S.criandoLista
         ? '<form class="form-novo" data-form="nova-lista"><input type="text" id="nova-lista-nome" placeholder="Nome da lista" maxlength="80" aria-label="Nome da nova lista">' +
+          '<select id="nova-lista-tipo" aria-label="Tipo da lista"><option value="Normal">Lista normal (cartões)</option><option value="Rotativa">Rotatividade semanal</option><option value="Recorrente">Recorrente (fila com Atendi)</option></select>' +
           '<div class="linha"><button type="submit" class="btn primario pequeno">Criar lista</button><button type="button" class="icone-btn" data-acao="cancelar-lista" aria-label="Cancelar">' + I.fechar + '</button></div></form>'
         : '<button type="button" class="lista-adicionar" data-acao="nova-lista">' + I.mais + 'Adicionar lista</button>') + '</div>';
     }
@@ -825,6 +827,8 @@
   }
 
   /* ---------- Ações do quadro ---------- */
+  function listaNormal(l) { return !l.tipo || l.tipo === 'Normal'; }
+
   function maiorOrdem(listaId) {
     return cartoesDaLista(listaId).reduce(function (m, c) { return Math.max(m, c.ordem); }, 0);
   }
@@ -868,11 +872,13 @@
     if (n > l.limite) aviso(l.nome + ' passou do limite de ' + l.limite + ' cartões (' + n + ' agora).');
   }
 
-  function criarListaNova(nome) {
+  function criarListaNova(nome, tipo) {
     nome = String(nome || '').trim();
     if (!nome) return;
-    escrever('criarLista', S.quadro.quadro.id, nome).then(function (r) {
+    escrever('criarLista', S.quadro.quadro.id, nome, tipo || 'Normal').then(function (r) {
       S.quadro.listas.push(r.lista);
+      if (r.lista.tipo === 'Rotativa') (S.quadro.rotativas = S.quadro.rotativas || {})[r.lista.id] = [];
+      if (r.lista.tipo === 'Recorrente') (S.quadro.recorrentes = S.quadro.recorrentes || {})[r.lista.id] = [];
       renderListas();
       var cont = $('#listas');
       if (cont) cont.scrollLeft = cont.scrollWidth;
@@ -895,6 +901,13 @@
   function menuLista(botao, id) {
     var l = lista(id);
     if (!l) return;
+    if (l.tipo === 'Rotativa' || l.tipo === 'Recorrente') {
+      abrirMenu(botao, [
+        { rotulo: 'Renomear lista', fn: function () { S.editandoLista = id; renderListas(); var inp = $('#lista-nome-' + id); if (inp) { inp.focus(); inp.select(); } } },
+        { rotulo: 'Arquivar lista', perigo: true, fn: function () { arquivarLista(id); } }
+      ]);
+      return;
+    }
     abrirMenu(botao, [
       { rotulo: 'Renomear lista', fn: function () { S.editandoLista = id; renderListas(); var inp = $('#lista-nome-' + id); if (inp) { inp.focus(); inp.select(); } } },
       { rotulo: l.limite ? 'Mudar limite de cartões (' + l.limite + ')' : 'Definir limite de cartões', fn: function () {
@@ -982,7 +995,7 @@
       '<aside class="gaveta" role="dialog" aria-modal="true" aria-labelledby="g-titulo" style="--espectro:' + corEspectro(idx) + '">' +
       '<header class="gaveta-topo"><div class="gaveta-linha1">' +
       '<label class="gaveta-onde">na lista <select id="g-lista"' + (ed ? '' : ' disabled') + '>' +
-      Q.listas.map(function (l) { return '<option value="' + esc(l.id) + '"' + (l.id === c.listaId ? ' selected' : '') + '>' + esc(l.nome) + '</option>'; }).join('') +
+      Q.listas.filter(listaNormal).map(function (l) { return '<option value="' + esc(l.id) + '"' + (l.id === c.listaId ? ' selected' : '') + '>' + esc(l.nome) + '</option>'; }).join('') +
       '</select></label><span class="id-chip">' + esc(c.id) + '</span>' +
       '<button type="button" class="icone-btn" data-acao="fechar-gaveta" aria-label="Fechar cartão">' + I.fechar + '</button></div>' +
       '<textarea id="g-titulo" class="gaveta-titulo" rows="1" maxlength="500" aria-label="Título do cartão"' + (ed ? '' : ' readonly') + '>' + esc(c.titulo) + '</textarea>' +
@@ -1445,6 +1458,263 @@
     });
   }
 
+  /* ---------- Listas de rodízio: rotatividade semanal e recorrente ---------- */
+  function htmlListaRodizio(l, i) {
+    var Q = S.quadro;
+    var ed = Q.podeEditar;
+    var rot = l.tipo === 'Rotativa';
+    var itens = ((rot ? Q.rotativas : Q.recorrentes) || {})[l.id] || [];
+    var nome = S.editandoLista === l.id
+      ? '<input class="lista-nome-input" id="lista-nome-' + esc(l.id) + '" data-lista-nome="' + esc(l.id) + '" value="' + esc(l.nome) + '" maxlength="80" aria-label="Nome da lista">'
+      : (ed
+        ? '<h2 class="lista-nome editavel-nome" role="button" tabindex="0" data-acao="renomear-lista" data-id="' + esc(l.id) + '" title="Clique para renomear, arraste para mover">' + esc(l.nome) + '</h2>'
+        : '<h2 class="lista-nome">' + esc(l.nome) + '</h2>');
+    return '<section class="lista lista-rodizio ' + (rot ? 'lista-rotativa' : 'lista-recorrente') + '" data-id="' + esc(l.id) + '" style="--espectro:' + corEspectro(i) + '" aria-label="Lista ' + esc(l.nome) + '">' +
+      '<header class="lista-cabeca">' + nome + '<span class="lista-conta" title="' + (rot ? 'Tarefas' : 'Pessoas na fila') + '">' + itens.length + '</span>' +
+      (ed ? '<button type="button" class="icone-btn" data-acao="menu-lista" data-id="' + esc(l.id) + '" aria-label="Opções da lista ' + esc(l.nome) + '">' + I.pontos + '</button>' : '') +
+      '</header><p class="lista-tipo">' + (rot ? I.rotina + 'Rotatividade semanal' : I.carrossel + 'Lista recorrente') + '</p>' +
+      (rot ? htmlCorpoRotativa(l, itens) : htmlCorpoRecorrente(l, itens)) + '</section>';
+  }
+
+  /* --- Rotatividade semanal --- */
+  function semanaRot(listaId) { return (S.rotSemana && S.rotSemana[listaId]) || 'atual'; }
+
+  function htmlCorpoRotativa(l, tarefas) {
+    var ed = S.quadro.podeEditar;
+    var sem = semanaRot(l.id);
+    var seg = semanaDe(hojeIso());
+    var ini = sem === 'proxima' ? somaDias(seg, 7) : seg;
+    var topo = '<div class="rot-topo"><div class="segmentado" role="group" aria-label="Semana">' +
+      '<button type="button" data-acao="rot-semana" data-lista="' + esc(l.id) + '" data-valor="atual" aria-pressed="' + (sem === 'atual') + '">Esta semana</button>' +
+      '<button type="button" data-acao="rot-semana" data-lista="' + esc(l.id) + '" data-valor="proxima" aria-pressed="' + (sem === 'proxima') + '">Próxima</button></div>' +
+      '<span class="texto-suave">' + dataBr(ini) + ' a ' + dataBr(somaDias(ini, 4)) + '</span></div>';
+    var linhas = tarefas.map(function (t) {
+      var w = t[sem];
+      var outra = sem === 'atual' ? t.proxima : t.atual;
+      var nomes = t.pessoas.slice();
+      S.usuarios.forEach(function (u) { if (nomes.map(norm).indexOf(norm(u.nome)) === -1) nomes.push(u.nome); });
+      if (w.pessoa && nomes.map(norm).indexOf(norm(w.pessoa)) === -1) nomes.push(w.pessoa);
+      var resp = ed
+        ? '<select class="rot-select' + (w.trocado ? ' trocado' : '') + '" data-rot-troca="' + esc(t.id) + '" data-semana="' + sem + '" aria-label="Quem cuida de ' + esc(t.tarefa) + '">' +
+          nomes.map(function (n, k) { return (k === t.pessoas.length && k < nomes.length ? '<option disabled>──────────</option>' : '') + '<option value="' + esc(n) + '"' + (norm(n) === norm(w.pessoa) ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>'
+        : '<b>' + esc(w.pessoa || 'Ninguém') + '</b>';
+      return '<div class="rot-item" data-tarefa="' + esc(t.id) + '">' +
+        '<div class="rot-linha1"><b class="rot-nome">' + esc(t.tarefa) + '</b><span class="chip" title="Repete todo dia útil">Diária</span>' +
+        (ed ? '<span class="rot-acoes"><button type="button" class="icone-btn" data-acao="rot-editar" data-lista="' + esc(l.id) + '" data-id="' + esc(t.id) + '" aria-label="Editar ' + esc(t.tarefa) + '" title="Editar tarefa">' + I.lapis + '</button>' +
+          '<button type="button" class="icone-btn" data-acao="rot-remover" data-id="' + esc(t.id) + '" aria-label="Remover ' + esc(t.tarefa) + '" title="Remover tarefa">' + I.lixo + '</button></span>' : '') + '</div>' +
+        (t.texto ? '<p class="rot-texto">' + esc(t.texto) + '</p>' : '') +
+        '<div class="rot-resp">' + avatar(w.pessoa || '?', true) + resp + '</div>' +
+        '<p class="rot-meta">' + (w.trocado ? 'Trocado nesta semana (o rodízio indica ' + esc(w.doRodizio) + '). ' + (ed ? '<button type="button" class="link-texto" data-acao="rot-voltar" data-id="' + esc(t.id) + '" data-semana="' + sem + '">Voltar ao rodízio</button>' : '') : '') +
+        (t.modo === 'Fixo' ? 'Nome fixo.' : (sem === 'atual' ? 'Próxima semana: ' : 'Esta semana: ') + '<b>' + esc(outra.pessoa || '—') + '</b>') + '</p></div>';
+    }).join('');
+    return '<div class="rot-corpo">' + topo + (linhas || '<p class="lista-vazia-dica">Nenhuma tarefa ainda.</p>') + '</div>' +
+      (ed ? '<div class="lista-pe"><button type="button" class="lista-adicionar" data-acao="rot-nova" data-lista="' + esc(l.id) + '">' + I.mais + 'Adicionar tarefa</button></div>' : '');
+  }
+
+  function rotTarefa(listaId, id) {
+    return (((S.quadro.rotativas || {})[listaId]) || []).filter(function (t) { return t.id === id; })[0] || null;
+  }
+  function listaDaTarefa(id) {
+    var k = Object.keys(S.quadro.rotativas || {});
+    for (var i = 0; i < k.length; i++) if (S.quadro.rotativas[k[i]].some(function (t) { return t.id === id; })) return k[i];
+    return '';
+  }
+  function sincronizarRot(listaId, r) {
+    setTimeout(function () { if (S.quadro && !pendentes) { S.quadro.rotativas[listaId] = r.tarefas; renderListas(); } }, 0);
+  }
+
+  function trocarRotativa(id, sem, nome) {
+    var lid = listaDaTarefa(id);
+    var t = lid ? rotTarefa(lid, id) : null;
+    if (!t) return;
+    var w = t[sem];
+    var antes = { pessoa: w.pessoa, trocado: w.trocado };
+    w.pessoa = nome || w.doRodizio;
+    w.trocado = !!nome && norm(nome) !== norm(w.doRodizio);
+    renderListas();
+    escrever('trocarResponsavelRotativa', id, sem, nome).then(function (r) { sincronizarRot(lid, r); })
+      .catch(function (e) { w.pessoa = antes.pessoa; w.trocado = antes.trocado; renderListas(); falhou(e); });
+  }
+
+  function removerTarefaRot(id) {
+    var lid = listaDaTarefa(id);
+    var t = lid ? rotTarefa(lid, id) : null;
+    if (!t) return;
+    confirmarAcao({ titulo: 'Remover a tarefa "' + t.tarefa + '"?', texto: 'Ela sai da lista. O histórico fica guardado.', confirmar: 'Remover' }).then(function (ok) {
+      if (!ok) return;
+      escrever('removerTarefaRotativa', id).then(function (r) { S.quadro.rotativas[lid] = r.tarefas; renderListas(); }).catch(falhou);
+    });
+  }
+
+  function modalTarefaRot(listaId, tarefaId) {
+    var t = tarefaId ? rotTarefa(listaId, tarefaId) : null;
+    var pessoas = t ? t.pessoas.slice() : [];
+    var inicio = t ? t.atual.pessoa : '';
+    var m = abrirModal('<form data-form="pedir"><div class="modal-cabeca"><h2 id="modal-titulo">' + (t ? 'Editar tarefa' : 'Nova tarefa') + '</h2>' +
+      '<p>A tarefa se repete todo dia útil. Escolha quem cuida dela e se o nome gira a cada semana.</p></div>' +
+      '<div class="modal-corpo">' +
+      '<div class="campo"><label for="tr-nome">Tarefa</label><input id="tr-nome" type="text" maxlength="120" value="' + esc(t ? t.tarefa : '') + '" placeholder="Ex.: Abrir a fila às 8h" autofocus></div>' +
+      '<div class="campo"><label for="tr-texto">Observação (opcional)</label><input id="tr-texto" type="text" maxlength="300" value="' + esc(t ? t.texto : '') + '"></div>' +
+      '<div class="campo"><span class="rotulo">Como o nome muda</span>' +
+      '<label class="opcao-radio"><input type="radio" name="tr-modo" value="Girar"' + (!t || t.modo !== 'Fixo' ? ' checked' : '') + '><strong>Girar toda semana</strong><small>Na segunda, a tarefa passa para a próxima pessoa da ordem.</small></label>' +
+      '<label class="opcao-radio"><input type="radio" name="tr-modo" value="Fixo"' + (t && t.modo === 'Fixo' ? ' checked' : '') + '><strong>Manter o mesmo nome</strong><small>A pessoa escolhida cuida da tarefa toda semana.</small></label></div>' +
+      '<div class="campo"><span class="rotulo">Pessoas, na ordem do rodízio</span><div id="tr-pessoas"></div>' +
+      '<div class="form-carrossel"><select id="tr-add" aria-label="Escolher pessoa"></select><button type="button" class="btn" data-tr="add">Adicionar</button></div>' +
+      '<div class="form-carrossel"><input type="text" id="tr-livre" maxlength="80" placeholder="Ou digite outro nome" aria-label="Outro nome"><button type="button" class="btn" data-tr="livre">Adicionar</button></div></div>' +
+      '<div class="campo"><label for="tr-inicio">Quem cuida desta semana</label><select id="tr-inicio"></select></div>' +
+      '</div><div class="modal-rodape"><div class="direita"><button type="button" class="btn sutil" data-acao="fechar-modal">Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></div></form>');
+    function desenhar() {
+      $('#tr-pessoas').innerHTML = pessoas.length ? '<ol class="car-lista">' + pessoas.map(function (n, k) {
+        return '<li class="car-item"><span class="car-pos">' + (k + 1) + 'º</span>' + avatar(n, true) + '<span class="car-corpo"><b>' + esc(n) + '</b></span><span class="car-acoes">' +
+          '<button type="button" class="icone-btn" data-tr="subir" data-i="' + k + '" aria-label="Subir ' + esc(n) + '"' + (k === 0 ? ' disabled' : '') + '>' + I.seta + '</button>' +
+          '<button type="button" class="icone-btn descer" data-tr="descer" data-i="' + k + '" aria-label="Descer ' + esc(n) + '"' + (k === pessoas.length - 1 ? ' disabled' : '') + '>' + I.seta + '</button>' +
+          '<button type="button" class="icone-btn" data-tr="tirar" data-i="' + k + '" aria-label="Tirar ' + esc(n) + '">' + I.lixo + '</button></span></li>';
+      }).join('') + '</ol>' : '<p class="texto-suave">Ninguém ainda.</p>';
+      $('#tr-add').innerHTML = '<option value="">Escolher pessoa…</option>' + S.usuarios.filter(function (u) { return pessoas.map(norm).indexOf(norm(u.nome)) === -1; })
+        .map(function (u) { return '<option value="' + esc(u.nome) + '">' + esc(u.nome) + '</option>'; }).join('');
+      if (pessoas.map(norm).indexOf(norm(inicio)) === -1) inicio = pessoas[0] || '';
+      $('#tr-inicio').innerHTML = pessoas.map(function (n) { return '<option value="' + esc(n) + '"' + (norm(n) === norm(inicio) ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('');
+    }
+    function incluir(nome) {
+      nome = String(nome || '').replace(/[;,=]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!nome) return;
+      if (pessoas.map(norm).indexOf(norm(nome)) !== -1) { aviso(nome + ' já está na tarefa.', { erro: true }); return; }
+      pessoas.push(nome);
+      desenhar();
+    }
+    desenhar();
+    m.addEventListener('change', function (ev) { if (ev.target.id === 'tr-inicio') inicio = ev.target.value; });
+    m.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-tr]');
+      if (!b) return;
+      var acao = b.getAttribute('data-tr');
+      var k = parseInt(b.getAttribute('data-i'), 10);
+      if (acao === 'add') { incluir($('#tr-add').value); }
+      else if (acao === 'livre') { incluir($('#tr-livre').value); $('#tr-livre').value = ''; }
+      else if (acao === 'tirar') { pessoas.splice(k, 1); desenhar(); }
+      else if (acao === 'subir' && k > 0) { pessoas.splice(k - 1, 0, pessoas.splice(k, 1)[0]); desenhar(); }
+      else if (acao === 'descer' && k < pessoas.length - 1) { pessoas.splice(k + 1, 0, pessoas.splice(k, 1)[0]); desenhar(); }
+    });
+    m.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.id === 'tr-livre') { ev.preventDefault(); incluir(ev.target.value); ev.target.value = ''; } });
+    m.querySelector('form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var dados = { id: tarefaId || '', tarefa: $('#tr-nome').value.trim(), texto: $('#tr-texto').value.trim(), pessoas: pessoas, inicio: $('#tr-inicio').value,
+        modo: (m.querySelector('input[name="tr-modo"]:checked') || {}).value || 'Girar' };
+      if (!dados.tarefa) { $('#tr-nome').focus(); return; }
+      if (!pessoas.length) { aviso('Escolha pelo menos uma pessoa para a tarefa.', { erro: true }); return; }
+      var b = m.querySelector('button[type="submit"]');
+      b.disabled = true;
+      escrever('salvarTarefaRotativa', listaId, dados).then(function (r) { fecharModal(); S.quadro.rotativas[listaId] = r.tarefas; renderListas(); })
+        .catch(function (e) { b.disabled = false; aviso(msgErro(e), { erro: true }); });
+    });
+  }
+
+  /* --- Lista recorrente --- */
+  function filaRec(listaId) { return ((S.quadro.recorrentes = S.quadro.recorrentes || {})[listaId] = S.quadro.recorrentes[listaId] || []); }
+  function sincronizarRec(listaId, r) {
+    setTimeout(function () { if (S.quadro && !pendentes) { S.quadro.recorrentes[listaId] = r.itens; renderListas(); } }, 0);
+  }
+  S.rascunhoRec = S.rascunhoRec || {};
+
+  function htmlCorpoRecorrente(l, itens) {
+    var ed = S.quadro.podeEditar;
+    var lid = esc(l.id);
+    var jaNaFila = itens.map(function (i) { return norm(i.pessoa); });
+    var lista = itens.length
+      ? '<p class="vez-agora">Na vez agora ' + avatar(itens[0].pessoa, true) + '<b>' + esc(itens[0].pessoa) + '</b>' + (itens[0].texto ? '<span class="texto-suave">' + esc(itens[0].texto) + '</span>' : '') + '</p>' +
+        '<ol class="car-lista">' + itens.map(function (i, n) {
+          var pend = !!i.pendente;
+          var info = i.atendimentos ? plural(i.atendimentos, 'atendimento', 'atendimentos') : 'Ainda não atendeu';
+          return '<li class="car-item' + (n === 0 ? ' na-vez' : '') + '">' +
+            '<label class="car-atendi" title="Marque quando atender: a pessoa vai para o fim da fila"><input type="checkbox" data-acao="rec-atendi" data-lista="' + lid + '" data-id="' + esc(i.id) + '"' + (ed && !pend ? '' : ' disabled') + ' aria-label="Atendi: ' + esc(i.pessoa) + '"><span>Atendi</span></label>' +
+            '<span class="car-pos">' + (n + 1) + 'º</span>' +
+            '<span class="car-corpo"><span class="car-nome"><b>' + esc(i.pessoa) + '</b>' + (n === 0 ? '<span class="chip chip-vez">Na vez</span>' : '') + '</span>' +
+            (i.texto ? '<span class="car-texto">' + esc(i.texto) + '</span>' : '') + '<small>' + info + '</small></span>' +
+            (ed && !pend ? '<span class="car-acoes">' + (n > 0 ? '<button type="button" class="icone-btn" data-acao="rec-na-vez" data-lista="' + lid + '" data-id="' + esc(i.id) + '" aria-label="Colocar ' + esc(i.pessoa) + ' na vez" title="Colocar na vez">' + I.seta + '</button>' : '') +
+              '<button type="button" class="icone-btn" data-acao="rec-editar" data-lista="' + lid + '" data-id="' + esc(i.id) + '" aria-label="Editar ' + esc(i.pessoa) + '" title="Editar">' + I.lapis + '</button>' +
+              '<button type="button" class="icone-btn" data-acao="rec-remover" data-lista="' + lid + '" data-id="' + esc(i.id) + '" aria-label="Tirar ' + esc(i.pessoa) + ' da lista" title="Tirar da lista">' + I.lixo + '</button></span>' : '') +
+            '</li>';
+        }).join('') + '</ol>'
+      : '<p class="lista-vazia-dica">Ninguém na fila ainda.</p>';
+    var form = ed
+      ? '<form class="form-carrossel" data-form="rec-novo" data-lista="' + lid + '"><input type="text" id="rec-pessoa-' + lid + '" data-rec-rascunho="pessoa:' + lid + '" list="rec-sug-' + lid + '" placeholder="Nome" maxlength="80" autocomplete="off" value="' + esc(S.rascunhoRec['pessoa:' + l.id] || '') + '" aria-label="Nome de quem entra na fila">' +
+        '<datalist id="rec-sug-' + lid + '">' + S.usuarios.filter(function (u) { return jaNaFila.indexOf(norm(u.nome)) === -1; }).map(function (u) { return '<option value="' + esc(u.nome) + '"></option>'; }).join('') + '</datalist>' +
+        '<input type="text" id="rec-texto-' + lid + '" data-rec-rascunho="texto:' + lid + '" placeholder="Texto (ex.: ramal)" maxlength="300" value="' + esc(S.rascunhoRec['texto:' + l.id] || '') + '" aria-label="Texto da pessoa">' +
+        '<button type="submit" class="btn">Adicionar</button></form>' +
+        '<button type="button" class="btn sutil pequeno" data-acao="rec-equipe" data-lista="' + lid + '">' + I.equipe + 'Adicionar toda a equipe do quadro</button>'
+      : '';
+    return '<div class="rec-corpo">' + lista + '</div>' + (form ? '<div class="lista-pe rec-pe">' + form + '</div>' : '');
+  }
+
+  function recAtendi(listaId, itemId) {
+    var itens = filaRec(listaId);
+    var i = itens.map(function (x) { return x.id; }).indexOf(itemId);
+    if (i === -1) return;
+    var p = itens.splice(i, 1)[0];
+    p.atendimentos = (p.atendimentos || 0) + 1;
+    itens.push(p);
+    renderListas();
+    escrever('passarVezLista', itemId).then(function (r) {
+      sincronizarRec(listaId, r);
+      aviso(p.pessoa + ' foi para o fim da fila.' + (r.itens.length > 1 ? ' Na vez: ' + r.itens[0].pessoa + '.' : ''), { acao: { rotulo: 'Desfazer', fn: function () {
+        escrever('reordenarLista', listaId, r.antes, itemId).then(function (r2) { sincronizarRec(listaId, r2); }).catch(falhou);
+      } } });
+    }).catch(falhou);
+  }
+
+  function recAdicionar(listaId, pessoa, texto) {
+    pessoa = String(pessoa || '').trim();
+    texto = String(texto || '').trim();
+    var itens = filaRec(listaId);
+    var campo = $('#rec-pessoa-' + listaId);
+    if (!pessoa) { if (campo) campo.focus(); return; }
+    if (itens.some(function (i) { return norm(i.pessoa) === norm(pessoa); })) { aviso(pessoa + ' já está nesta lista.', { erro: true }); if (campo) campo.focus(); return; }
+    var tmp = { id: 'tmp-' + Date.now(), pessoa: pessoa, texto: texto, ordem: 1e12, atendimentos: 0, pendente: true };
+    itens.push(tmp);
+    S.rascunhoRec['pessoa:' + listaId] = '';
+    S.rascunhoRec['texto:' + listaId] = '';
+    renderListas();
+    var depois = $('#rec-pessoa-' + listaId);
+    if (depois) depois.focus();
+    escrever('adicionarPessoaLista', listaId, pessoa, texto).then(function (r) { sincronizarRec(listaId, r); })
+      .catch(function (e) { S.quadro.recorrentes[listaId] = filaRec(listaId).filter(function (i) { return i !== tmp; }); renderListas(); falhou(e); });
+  }
+
+  function recEquipe(listaId) {
+    escrever('adicionarEquipeLista', listaId).then(function (r) {
+      S.quadro.recorrentes[listaId] = r.itens; renderListas();
+      aviso(plural(r.adicionados, 'pessoa entrou', 'pessoas entraram') + ' na lista.');
+    }).catch(function (e) { aviso(msgErro(e), { erro: true }); });
+  }
+  function recNaVez(listaId, itemId) {
+    escrever('colocarNaVezLista', itemId).then(function (r) { S.quadro.recorrentes[listaId] = r.itens; renderListas(); }).catch(falhou);
+  }
+  function recRemover(listaId, itemId) {
+    var p = filaRec(listaId).filter(function (x) { return x.id === itemId; })[0];
+    if (!p) return;
+    confirmarAcao({ titulo: 'Tirar ' + p.pessoa + ' da lista?', texto: 'A pessoa sai da fila. O histórico fica guardado.', confirmar: 'Tirar' }).then(function (ok) {
+      if (!ok) return;
+      escrever('removerPessoaLista', itemId).then(function (r) { S.quadro.recorrentes[listaId] = r.itens; renderListas(); }).catch(falhou);
+    });
+  }
+  function recEditar(listaId, itemId) {
+    var p = filaRec(listaId).filter(function (x) { return x.id === itemId; })[0];
+    if (!p) return;
+    var m = abrirModal('<form data-form="pedir"><div class="modal-cabeca"><h2 id="modal-titulo">Editar participante</h2></div>' +
+      '<div class="modal-corpo"><div class="campo"><label for="rp-nome">Nome</label><input id="rp-nome" type="text" value="' + esc(p.pessoa) + '" maxlength="80" autofocus></div>' +
+      '<div class="campo"><label for="rp-texto">Texto</label><input id="rp-texto" type="text" value="' + esc(p.texto) + '" maxlength="300"><span class="ajuda">Aparece ao lado do nome, por exemplo o ramal ou um aviso.</span></div></div>' +
+      '<div class="modal-rodape"><div class="direita"><button type="button" class="btn sutil" data-acao="fechar-modal">Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></div></form>');
+    m.querySelector('form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var dados = { pessoa: $('#rp-nome').value.trim(), texto: $('#rp-texto').value.trim() };
+      if (!dados.pessoa) { $('#rp-nome').focus(); return; }
+      var b = m.querySelector('button[type="submit"]');
+      b.disabled = true;
+      escrever('atualizarPessoaLista', itemId, dados).then(function (r) { fecharModal(); S.quadro.recorrentes[listaId] = r.itens; renderListas(); })
+        .catch(function (e) { b.disabled = false; aviso(msgErro(e), { erro: true }); });
+    });
+  }
+
   /* ---------- Checklist ---------- */
   function contarChecklist(cartaoId) {
     var c = cartao(cartaoId);
@@ -1872,9 +2142,9 @@
       aviso(S.filtros.meus ? 'Mostrando só os seus cartões.' : 'Mostrando todos os cartões.');
       return true;
     }
-    if ((k === 'n' || k === 'N') && S.quadro.podeEditar && S.quadro.listas.length) {
+    if ((k === 'n' || k === 'N') && S.quadro.podeEditar && S.quadro.listas.filter(listaNormal).length) {
       var foco = cartaoEmFoco();
-      S.novoEm = foco ? foco.closest('.lista').getAttribute('data-id') : S.quadro.listas[0].id;
+      S.novoEm = foco ? foco.closest('.lista').getAttribute('data-id') : S.quadro.listas.filter(listaNormal)[0].id;
       S.rascunhoNovo = '';
       S.criandoLista = false;
       renderListas();
@@ -2088,7 +2358,7 @@
     return '<form class="escala-config" data-esc-form="config">' +
       '<label class="alternar"><input type="checkbox" id="cfg-esc-ativa"' + (e.ligada ? ' checked' : '') + '>Usar a escala da semana neste quadro</label>' +
       '<section><h3>Frentes</h3><p class="ajuda">Marque as listas que recebem demandas. Cartão novo sem responsável que entra numa frente vai para quem está na vez. Vagas em branco dividem igualmente.</p>' +
-      '<div class="cfg-frentes">' + (e.listas || []).map(function (l) {
+      '<div class="cfg-frentes">' + (e.listas || []).filter(listaNormal).map(function (l) {
         var marcada = Object.prototype.hasOwnProperty.call(frentes, l.id);
         return '<div class="cfg-frente"><label class="alternar"><input type="checkbox" data-cfg-frente="' + esc(l.id) + '"' + (marcada ? ' checked' : '') + '>' + esc(l.nome) + '</label>' +
           '<label class="cfg-vagas">Vagas <input type="number" min="1" step="1" data-cfg-vagas="' + esc(l.id) + '" value="' + esc(marcada ? frentes[l.id] : '') + '" placeholder="igual"' + (marcada ? '' : ' disabled') + '></label></div>';
@@ -3482,6 +3752,16 @@
     'arquivar-cartao': function () { arquivarCartao(S.cartaoAberto); },
     'duplicar-cartao': function () { duplicarCartao(S.cartaoAberto); },
     'editar-vez': function () { abrirModalEscala('semana'); },
+    'rot-semana': function (el) { (S.rotSemana = S.rotSemana || {})[el.getAttribute('data-lista')] = el.getAttribute('data-valor'); renderListas(); },
+    'rot-nova': function (el) { modalTarefaRot(el.getAttribute('data-lista'), ''); },
+    'rot-editar': function (el) { modalTarefaRot(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
+    'rot-remover': function (el) { removerTarefaRot(el.getAttribute('data-id')); },
+    'rot-voltar': function (el) { trocarRotativa(el.getAttribute('data-id'), el.getAttribute('data-semana'), ''); },
+    'rec-atendi': function (el) { recAtendi(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
+    'rec-na-vez': function (el) { recNaVez(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
+    'rec-editar': function (el) { recEditar(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
+    'rec-remover': function (el) { recRemover(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
+    'rec-equipe': function (el) { recEquipe(el.getAttribute('data-lista')); },
     'dia-almoco': function () { abrirModalDia('almoco'); },
     'dia-home': function () { abrirModalDia('home'); },
     'carrossel-iniciar': function () { S.carrosselAberto = true; renderSecaoCarrossel(); var i = $('#car-pessoa'); if (i) i.focus(); },
@@ -3577,7 +3857,8 @@
     if (!tipo || tipo === 'quadro' || tipo === 'pedir') return;
     ev.preventDefault();
     if (tipo === 'novo-cartao') { var ta = $('#novo-cartao-texto'); criarCartaoRapido(f.getAttribute('data-lista'), ta.value); }
-    if (tipo === 'nova-lista') { var inp = $('#nova-lista-nome'); criarListaNova(inp.value); }
+    if (tipo === 'nova-lista') { var inp = $('#nova-lista-nome'); var tp = $('#nova-lista-tipo'); criarListaNova(inp.value, tp ? tp.value : 'Normal'); }
+    if (tipo === 'rec-novo') { var lid = f.getAttribute('data-lista'); recAdicionar(lid, ($('#rec-pessoa-' + lid) || {}).value, ($('#rec-texto-' + lid) || {}).value); }
     if (tipo === 'novo-item') { adicionarItem($('#g-item-novo').value); }
     if (tipo === 'carrossel-novo') { carrosselAdicionar($('#car-pessoa').value, $('#car-texto').value); }
     if (tipo === 'comentar') { comentar($('#g-comentario').value); }
@@ -3607,6 +3888,7 @@
     var t = ev.target;
     if (t.id === 'filtro-texto') { S.filtros.texto = t.value; renderListas(); return; }
     if (t.id === 'novo-cartao-texto') { S.rascunhoNovo = t.value; return; }
+    if (t.hasAttribute && t.hasAttribute('data-rec-rascunho')) { S.rascunhoRec[t.getAttribute('data-rec-rascunho')] = t.value; return; }
     if (t.id === 'g-titulo') { ajustarAlturaTitulo(); return; }
     if (t.id === 'g-descricao') { t.setAttribute('data-sujo', '1'); var d = $('#g-desc-dica'); if (d) d.textContent = 'Salva quando você sair do campo.'; return; }
     if (t.id === 'g-comentario') { S.rascunho.comentario = t.value; return; }
@@ -3616,6 +3898,7 @@
   document.addEventListener('change', function (ev) {
     var t = ev.target;
     if (t.hasAttribute && t.hasAttribute('data-nf-mudou')) { aoMudarNovo(t.getAttribute('data-nf-mudou'), t); return; }
+    if (t.hasAttribute && t.hasAttribute('data-rot-troca')) { trocarRotativa(t.getAttribute('data-rot-troca'), t.getAttribute('data-semana'), t.value); return; }
     if (t.id === 'filtro-responsavel') { S.filtros.responsavel = t.value; atualizarBotaoFiltros(); renderListas(); return; }
     if (t.id === 'filtro-etiqueta') { S.filtros.etiqueta = t.value; atualizarBotaoFiltros(); renderListas(); return; }
     if (t.id === 'filtro-prazo') { S.filtros.prazo = t.value; atualizarBotaoFiltros(); renderListas(); return; }

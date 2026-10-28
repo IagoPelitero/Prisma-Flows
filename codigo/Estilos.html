@@ -763,4 +763,30 @@ button.cel.home:hover { background: var(--primaria); color: var(--sobre-primaria
 .dia-hoje b { font-weight: 700; }
 .dia-hoje-rotulo { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--tinta-2); }
 .modal-rodape.sem-borda { border-top: 0; padding-left: 0; padding-right: 0; }
+
+/* ---------- Listas de rodízio: rotatividade semanal e recorrente ---------- */
+.lista-tipo { display: flex; align-items: center; gap: 6px; margin: -2px 14px 8px; font-size: 12px; font-weight: 600; color: var(--tinta-2); }
+.lista-tipo svg.ic { width: 14px; height: 14px; }
+.rot-corpo, .rec-corpo { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 8px; }
+.rot-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 0 2px; font-size: 12.5px; }
+.rot-item { background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(22, 32, 51, .06); display: flex; flex-direction: column; gap: 6px; }
+.rot-linha1 { display: flex; align-items: center; gap: 8px; }
+.rot-nome { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
+.rot-acoes { display: flex; gap: 0; flex: none; }
+.rot-texto { margin: 0; color: var(--tinta-2); font-size: 12.5px; overflow-wrap: anywhere; }
+.rot-resp { display: flex; align-items: center; gap: 8px; }
+.rot-select { flex: 1; min-width: 0; min-height: 34px; border: 1px solid var(--linha); border-radius: 8px; background: var(--superficie); color: var(--tinta); padding: 3px 6px; font-weight: 600; }
+.rot-select.trocado { border-color: var(--aviso); background: var(--aviso-suave); }
+.rot-meta { margin: 0; font-size: 12px; color: var(--tinta-3); }
+.rot-meta b { color: var(--tinta-2); font-weight: 650; }
+.lista-recorrente { flex-basis: 330px; width: 330px; }
+.lista-recorrente .car-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: start; padding: 8px 10px; }
+.lista-recorrente .car-atendi { grid-row: 1 / span 2; flex-direction: column; align-self: center; gap: 2px; font-size: 11.5px; }
+.lista-recorrente .car-pos { display: none; }
+.lista-recorrente .car-corpo { grid-column: 2; }
+.lista-recorrente .car-acoes { grid-column: 2; justify-self: end; margin: 0; }
+.lista-recorrente .chip-vez { white-space: nowrap; }
+.rec-pe { display: flex; flex-direction: column; gap: 8px; }
+.lista-rodizio .form-carrossel input { flex: 1 1 100%; }
+.lista-rodizio .form-carrossel .btn { flex: 1 1 100%; }
 </style>
