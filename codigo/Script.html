@@ -668,6 +668,7 @@
       (Q.escala && (Q.escala.ligada || Q.escala.podeAdministrar) ? '<button type="button" class="btn sutil" data-acao="escala" aria-label="Escala da semana">' + I.escala + '<span class="txt-btn">Escala</span></button>' : '') +
       '<button type="button" class="btn sutil" data-acao="dia-almoco" aria-label="Escala de almoço">' + I.almoco + '<span class="txt-btn">Almoço</span></button>' +
       '<button type="button" class="btn sutil" data-acao="dia-home" aria-label="Escala de home office">' + I.casa + '<span class="txt-btn">Home</span></button>' +
+      '<button type="button" class="btn sutil" data-acao="dia-mensal" aria-label="Escala mensal">' + I.calendario + '<span class="txt-btn">Mensal</span></button>' +
       '<button type="button" class="btn sutil so-desktop" data-acao="atalhos" aria-label="Atalhos do teclado" title="Atalhos do teclado (?)">' + I.teclado + '<span class="txt-btn">Atalhos</span></button>' +
       (Q.podeAdministrar ? '<button type="button" class="btn sutil" data-acao="configurar-quadro" aria-label="Configurar quadro">' + I.ajustes + '<span class="txt-btn">Configurar</span></button>' : '') +
       '</div></header>' +
@@ -2471,8 +2472,8 @@
   function abrirModalDia(aba) {
     if (!S.quadro) return;
     var M = S.dia = { aba: aba || 'almoco', dados: null, carregando: true, erro: '' };
-    abrirModal('<div class="modal-cabeca"><h2 id="modal-titulo">Almoço e home</h2>' +
-      '<p>Escala da semana em ' + esc(S.quadro.quadro.nome) + '. Quem edita o quadro ajusta aqui.</p></div>' +
+    abrirModal('<div class="modal-cabeca"><h2 id="modal-titulo">Almoço, home e escala mensal</h2>' +
+      '<p>Escalas de ' + esc(S.quadro.quadro.nome) + '. Quem edita o quadro ajusta aqui.</p></div>' +
       '<div class="abas-modal" role="tablist" id="dia-abas"></div>' +
       '<div class="modal-corpo" id="dia-corpo"></div>' +
       '<div class="modal-rodape"><div class="direita"><button type="button" class="btn primario" data-acao="fechar-modal">Fechar</button></div></div>',
@@ -2483,6 +2484,7 @@
     m.addEventListener('submit', aoEnviarDia);
     renderModalDia();
     carregarDia('');
+    if (S.dia.aba === 'mensal') carregarMensal('quadro', '');
   }
 
   function carregarDia(semana) {
@@ -2510,13 +2512,14 @@
     var corpo = $('#dia-corpo');
     if (!M || !abas || !corpo) return;
     var d = M.dados;
-    var itens = [['almoco', 'Almoço'], ['home', 'Home']];
+    var itens = [['almoco', 'Almoço'], ['home', 'Home'], ['mensal', 'Mensal']];
     if (d && d.podeAdministrar) itens.push(['config', 'Configurar']);
     abas.innerHTML = itens.map(function (a) {
       return '<button type="button" role="tab" aria-selected="' + (M.aba === a[0]) + '" data-dia="aba" data-valor="' + a[0] + '">' + a[1] + '</button>';
     }).join('');
     var ativo = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-foco') : null;
-    if (M.erro) corpo.innerHTML = '<p class="texto-suave">' + esc(M.erro) + '</p>';
+    if (M.aba === 'mensal') corpo.innerHTML = htmlMensal('quadro');
+    else if (M.erro) corpo.innerHTML = '<p class="texto-suave">' + esc(M.erro) + '</p>';
     else if (!d) corpo.innerHTML = htmlCarregando('Montando a escala');
     else corpo.innerHTML = M.aba === 'config' ? htmlDiaConfig() : htmlDiaSemana();
     if (ativo) { var f = $('[data-foco="' + ativo + '"]'); if (f) f.focus(); }
@@ -2646,7 +2649,13 @@
     if (!b || !M || b.tagName === 'SELECT') return;
     var tipo = b.getAttribute('data-dia');
     var d = M.dados;
-    if (tipo === 'aba') { M.aba = b.getAttribute('data-valor'); renderModalDia(); return; }
+    if (tipo === 'aba') {
+      M.aba = b.getAttribute('data-valor');
+      renderModalDia();
+      if (M.aba === 'mensal' && precisaCarregarMensal('quadro')) carregarMensal('quadro', '');
+      return;
+    }
+    if (tipo === 'mes') { navegarMes('quadro', b.getAttribute('data-valor')); return; }
     if (!d) return;
     if (tipo === 'semana') {
       var v = b.getAttribute('data-valor');
@@ -2721,6 +2730,122 @@
       renderModalDia();
       aviso('Escalas do quadro salvas.');
     }).catch(function (e) { botao.disabled = false; aviso(msgErro(e), { erro: true }); });
+  }
+
+  /* ------------------------------------------------------------------
+     Escala mensal: 1º horário, 2º horário ou Férias (no quadro e na tela Equipe)
+     ------------------------------------------------------------------ */
+  var MESES_LONGOS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  function nomeMes(mes) { var n = MESES_LONGOS[parseInt(mes.slice(5, 7), 10) - 1]; return n.charAt(0).toUpperCase() + n.slice(1) + ' de ' + mes.slice(0, 4); }
+  function estadoMensal(ctx) {
+    var dono = ctx === 'quadro' ? S.dia : S.equipe;
+    return dono ? (dono.mensal = dono.mensal || { dados: null, carregando: false, erro: '' }) : null;
+  }
+  /* O estado nasce na primeira vez que a aba é desenhada; só falta carregar se ainda não tem dados nem busca em andamento. */
+  function precisaCarregarMensal(ctx) {
+    var M = estadoMensal(ctx);
+    return !!M && !M.dados && !M.carregando;
+  }
+  function renderMensal(ctx) {
+    var ativo = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-foco') : null;
+    if (ctx === 'quadro') renderModalDia(); else renderEquipeCorpo();
+    if (ativo) { var f = $('[data-foco="' + ativo + '"]'); if (f) f.focus(); }
+  }
+  function carregarMensal(ctx, mes) {
+    var M = estadoMensal(ctx);
+    var dono = ctx === 'quadro' ? S.dia : S.equipe;
+    if (!M) return;
+    M.carregando = true;
+    M.erro = '';
+    renderMensal(ctx);
+    api('obterEscalaMensal', ctx === 'quadro' ? S.quadro.quadro.id : '', mes || '').then(function (d) {
+      if ((ctx === 'quadro' ? S.dia : S.equipe) !== dono) return;
+      M.dados = d;
+      M.carregando = false;
+      renderMensal(ctx);
+    }).catch(function (e) {
+      if ((ctx === 'quadro' ? S.dia : S.equipe) !== dono) return;
+      M.carregando = false;
+      M.erro = msgErro(e);
+      renderMensal(ctx);
+    });
+  }
+  function navegarMes(ctx, valor) {
+    var M = estadoMensal(ctx);
+    if (!M || !M.dados) return;
+    carregarMensal(ctx, valor === 'ant' ? M.dados.mesAnterior : (valor === 'prox' ? M.dados.proximoMes : ''));
+  }
+  function recontarMensal(d) {
+    d.dias.forEach(function (dia) { d.contagem[dia] = { primeiro: 0, segundo: 0, ferias: 0 }; });
+    d.pessoas.forEach(function (p) {
+      Object.keys(p.turnos).forEach(function (dia) {
+        var c = d.contagem[dia];
+        if (!c) return;
+        if (p.turnos[dia] === d.turnos[0]) c.primeiro++; else if (p.turnos[dia] === d.turnos[1]) c.segundo++; else c.ferias++;
+      });
+    });
+  }
+  function htmlMensal(ctx) {
+    var M = estadoMensal(ctx);
+    if (!M) return '';
+    if (M.erro) return '<p class="texto-suave">' + esc(M.erro) + '</p>';
+    var d = M.dados;
+    if (!d) return htmlCarregando('Montando a escala do mês');
+    var nav = function (v) { return (ctx === 'quadro' ? 'data-dia="mes"' : 'data-acao="eq-mes"') + ' data-valor="' + v + '"'; };
+    var ehEsteMes = d.mes === d.hoje.slice(0, 7);
+    var barra = '<div class="eq-barra"><div class="eq-barra-esq"><div class="segmentado" role="group" aria-label="Mês">' +
+      '<button type="button" ' + nav('ant') + ' aria-label="Mês anterior">‹ Anterior</button>' +
+      '<button type="button" ' + nav('hoje') + ' aria-pressed="' + ehEsteMes + '">Este mês</button>' +
+      '<button type="button" ' + nav('prox') + ' aria-label="Próximo mês">Próximo ›</button></div>' +
+      '<strong class="mes-nome">' + esc(nomeMes(d.mes)) + '</strong></div></div>';
+    var cab = '<th class="col-nome" scope="col">Pessoa</th>' + d.dias.map(function (dia) {
+      var c = d.contagem[dia];
+      return '<th scope="col" class="dia' + (dia === d.hoje ? ' hoje' : '') + '"><span class="dia-nome">' + DIAS_CURTOS[diaDaSemana(dia)] + ' ' + dataBr(dia) + '</span>' +
+        (d.feriados[dia] ? '<span class="dia-conta">Feriado</span>'
+          : '<span class="dia-conta">1º: ' + c.primeiro + ' · 2º: ' + c.segundo + '</span><span class="dia-conta">Férias: ' + c.ferias + '</span>') + '</th>';
+    }).join('');
+    var linhas = d.pessoas.map(function (p) {
+      var celulas = d.dias.map(function (dia) {
+        if (d.feriados[dia]) return '<td><span class="cel feriado">Feriado</span></td>';
+        var v = p.turnos[dia] || '';
+        var cls = v === d.turnos[0] ? 'ms-1' : (v === d.turnos[1] ? 'ms-2' : (v ? 'ms-f' : ''));
+        if (!d.podeEditar) return '<td><span class="cel ' + (v ? 'ms-ro ' + cls : 'pres') + '">' + (v ? esc(v) : '—') + '</span></td>';
+        return '<td><select class="sel-mensal ' + cls + '" data-mensal="1" data-ctx="' + ctx + '" data-email="' + esc(p.email) + '" data-data="' + dia + '" data-foco="ms-' + ctx + '-' + esc(p.email) + '-' + dia + '" aria-label="' + esc(p.nome) + ', ' + dataComDia(dia) + '">' +
+          '<option value="">—</option>' + d.turnos.map(function (t) { return '<option value="' + esc(t) + '"' + (t === v ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select></td>';
+      }).join('');
+      return '<tr><th scope="row" class="col-nome"><span class="pessoa-cel">' + avatar(p.nome, true) + '<span>' + esc(p.nome) + (p.eu ? ' <span class="chip">você</span>' : '') + '</span></span></th>' + celulas + '</tr>';
+    }).join('');
+    var tabela = d.pessoas.length
+      ? '<div class="grade-eq-caixa' + (M.carregando ? ' carregando' : '') + '"><div class="rolagem-x"><table class="grade-eq grade-mensal"><thead><tr>' + cab + '</tr></thead><tbody>' + linhas + '</tbody></table></div></div>'
+      : '<div class="vazio"><h2>Ninguém na equipe</h2><p>Cadastre pessoas na Administração. Quem tem perfil Leitor não entra na grade.</p></div>';
+    return barra + tabela +
+      '<div class="legenda"><span><i class="l-ms1"></i>' + esc(d.turnos[0]) + '</span><span><i class="l-ms2"></i>' + esc(d.turnos[1]) + '</span><span><i class="l-msf"></i>' + esc(d.turnos[2]) + '</span><span><i class="l-fer"></i>Feriado</span></div>' +
+      '<p class="ajuda eq-nota">' + (d.podeEditar ? 'Escolha o texto de cada pessoa em cada dia. ' : (ctx === 'equipe' ? 'Só ADM edita aqui; no quadro, quem edita o quadro ajusta a equipe dele. ' : '')) +
+      'Só segunda a sexta. A marcação é da pessoa: vale igual no quadro e na tela Equipe. “Férias” é só um texto, não muda as Ausências nem o rodízio.</p>';
+  }
+  function aoMudarMensal(t) {
+    var ctx = t.getAttribute('data-ctx');
+    var M = estadoMensal(ctx);
+    var dono = ctx === 'quadro' ? S.dia : S.equipe;
+    if (!M || !M.dados) return;
+    var d = M.dados;
+    var email = t.getAttribute('data-email');
+    var dia = t.getAttribute('data-data');
+    var p = d.pessoas.filter(function (x) { return x.email === email; })[0];
+    if (!p) return;
+    if (t.value) p.turnos[dia] = t.value; else delete p.turnos[dia];
+    recontarMensal(d);
+    renderMensal(ctx);
+    escrever('definirMensal', ctx === 'quadro' ? S.quadro.quadro.id : '', email, dia, t.value).then(function (r) {
+      setTimeout(function () {
+        if ((ctx === 'quadro' ? S.dia : S.equipe) !== dono || pendentes || !M.dados || r.dados.mes !== M.dados.mes) return;
+        M.dados = r.dados;
+        renderMensal(ctx);
+      }, 0);
+    }).catch(function (e) {
+      aviso(msgErro(e), { erro: true });
+      if ((ctx === 'quadro' ? S.dia : S.equipe) === dono) carregarMensal(ctx, d.mes);
+    });
   }
 
   /* ------------------------------------------------------------------
@@ -3029,6 +3154,7 @@
     carregarEquipeSemana('');
     if (S.equipe.aba === 'banco') carregarBanco('');
     if (S.equipe.aba === 'ausencias') carregarAusenciasEquipe();
+    if (S.equipe.aba === 'mensal') carregarMensal('equipe', '');
   }
 
   function htmlEquipe() {
@@ -3043,7 +3169,7 @@
     if (!E || !el) return;
     var d = E.dados;
     var pend = S.resumoEquipe && S.usuario && S.usuario.perfil === 'ADM' ? S.resumoEquipe.pendentes : 0;
-    var itens = [['semana', 'Semana'], ['banco', 'Banco de horas' + (pend ? '<span class="selo">' + pend + '</span>' : '')]];
+    var itens = [['semana', 'Semana'], ['mensal', 'Mensal'], ['banco', 'Banco de horas' + (pend ? '<span class="selo">' + pend + '</span>' : '')]];
     if (d && d.podeGerirAusencias) itens.push(['ausencias', 'Férias e folgas']);
     el.innerHTML = itens.map(function (a) {
       return '<button type="button" role="tab" aria-selected="' + (E.aba === a[0]) + '" data-acao="eq-aba" data-valor="' + a[0] + '">' + a[1] + '</button>';
@@ -3056,6 +3182,7 @@
     if (!E || !el) return;
     renderEquipeAbas();
     if (E.aba === 'banco') el.innerHTML = htmlEquipeBanco();
+    else if (E.aba === 'mensal') el.innerHTML = htmlMensal('equipe');
     else if (E.aba === 'ausencias') el.innerHTML = htmlEquipeAusencias();
     else el.innerHTML = htmlEquipeSemana();
   }
@@ -3764,6 +3891,8 @@
     'rec-equipe': function (el) { recEquipe(el.getAttribute('data-lista')); },
     'dia-almoco': function () { abrirModalDia('almoco'); },
     'dia-home': function () { abrirModalDia('home'); },
+    'dia-mensal': function () { abrirModalDia('mensal'); },
+    'eq-mes': function (el) { navegarMes('equipe', el.getAttribute('data-valor')); },
     'carrossel-iniciar': function () { S.carrosselAberto = true; renderSecaoCarrossel(); var i = $('#car-pessoa'); if (i) i.focus(); },
     'carrossel-atendi': function (el) { carrosselAtendi(el.getAttribute('data-id')); },
     'carrossel-na-vez': function (el) { carrosselNaVez(el.getAttribute('data-id')); },
@@ -3810,6 +3939,7 @@
       E.aba = el.getAttribute('data-valor');
       renderEquipeCorpo();
       if (E.aba === 'semana') carregarEquipeSemana(E.semana);
+      else if (E.aba === 'mensal') { if (precisaCarregarMensal('equipe')) carregarMensal('equipe', ''); }
       else if (E.aba === 'banco') carregarBanco(E.alvo);
       else if (E.aba === 'ausencias') carregarAusenciasEquipe();
     },
@@ -3898,6 +4028,7 @@
   document.addEventListener('change', function (ev) {
     var t = ev.target;
     if (t.hasAttribute && t.hasAttribute('data-nf-mudou')) { aoMudarNovo(t.getAttribute('data-nf-mudou'), t); return; }
+    if (t.hasAttribute && t.hasAttribute('data-mensal')) { aoMudarMensal(t); return; }
     if (t.hasAttribute && t.hasAttribute('data-rot-troca')) { trocarRotativa(t.getAttribute('data-rot-troca'), t.getAttribute('data-semana'), t.value); return; }
     if (t.id === 'filtro-responsavel') { S.filtros.responsavel = t.value; atualizarBotaoFiltros(); renderListas(); return; }
     if (t.id === 'filtro-etiqueta') { S.filtros.etiqueta = t.value; atualizarBotaoFiltros(); renderListas(); return; }

@@ -767,7 +767,7 @@ button.cel.home:hover { background: var(--primaria); color: var(--sobre-primaria
 /* ---------- Listas de rodízio: rotatividade semanal e recorrente ---------- */
 .lista-tipo { display: flex; align-items: center; gap: 6px; margin: -2px 14px 8px; font-size: 12px; font-weight: 600; color: var(--tinta-2); }
 .lista-tipo svg.ic { width: 14px; height: 14px; }
-.rot-corpo, .rec-corpo { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 8px; }
+.rot-corpo, .rec-corpo { flex: 1 1 auto; min-height: 12px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 0 10px 8px; }
 .rot-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 0 2px; font-size: 12.5px; }
 .rot-item { background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(22, 32, 51, .06); display: flex; flex-direction: column; gap: 6px; }
 .rot-linha1 { display: flex; align-items: center; gap: 8px; }
@@ -789,4 +789,16 @@ button.cel.home:hover { background: var(--primaria); color: var(--sobre-primaria
 .rec-pe { display: flex; flex-direction: column; gap: 8px; }
 .lista-rodizio .form-carrossel input { flex: 1 1 100%; }
 .lista-rodizio .form-carrossel .btn { flex: 1 1 100%; }
+
+/* ---------- Escala mensal ---------- */
+.mes-nome { font-size: 15px; }
+.grade-mensal th.dia { min-width: 100px; }
+.sel-mensal { width: 100%; min-width: 92px; min-height: 36px; border: 1px solid var(--linha); border-radius: 8px; background: var(--superficie); color: var(--tinta); padding: 4px 4px; font-weight: 600; font-size: 12.5px; }
+.sel-mensal.ms-1, .cel.ms-1 { background: var(--primaria-suave); border-color: var(--primaria); }
+.sel-mensal.ms-2, .cel.ms-2 { background: var(--ok-suave); border-color: var(--ok); }
+.sel-mensal.ms-f, .cel.ms-f { background: var(--aviso-suave); border-color: var(--aviso); color: var(--aviso); }
+.cel.ms-ro { border-width: 1px; border-style: solid; }
+.legenda .l-ms1 { background: var(--primaria-suave); border: 1px solid var(--primaria); }
+.legenda .l-ms2 { background: var(--ok-suave); border: 1px solid var(--ok); }
+.legenda .l-msf { background: var(--aviso-suave); border: 1px solid var(--aviso); }
 </style>

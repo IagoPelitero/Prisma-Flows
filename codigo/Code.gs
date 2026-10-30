@@ -13,7 +13,7 @@
  * - Toda gravação passa por LockService para duas pessoas não pisarem uma na outra.
  */
 
-const SCHEMA_VERSION = '1.4.0';
+const SCHEMA_VERSION = '1.5.0';
 
 const ABAS = {
   QUADROS: {
@@ -24,6 +24,10 @@ const ABAS = {
   LISTAS: {
     nome: 'Listas', prefixo: 'LS',
     colunas: ['ID', 'Quadro_ID', 'Nome', 'Ordem', 'Limite_WIP', 'Ativo', 'Criado_em', 'Criado_por', 'Frente', 'Frente_Vagas', 'Tipo']
+  },
+  MENSAL: {
+    nome: 'Mensal', prefixo: 'MS',
+    colunas: ['ID', 'Email', 'Pessoa', 'Data', 'Turno', 'Ativo', 'Criado_em', 'Criado_por']
   },
   ROTATIVA: {
     nome: 'Rotativa', prefixo: 'RV',
@@ -112,6 +116,7 @@ const CONFIG_PADRAO = [
 const PERFIS = ['ADM', 'Membro', 'Leitor'];
 const LIMITE_CARROSSEL = 60;
 const TIPOS_LISTA = ['Normal', 'Rotativa', 'Recorrente'];
+const TURNOS_MENSAL = ['1º horário', '2º horário', 'Férias'];
 const TURNOS_ALMOCO_PADRAO = ['11:30', '12:00', '12:30', '13:00'];
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente'];
 const COR_QUADRO_PADRAO = '#3B5BDB';
@@ -3023,6 +3028,113 @@ function salvarConfigDiaria(quadroId, dados) {
     gravarCampos_(tq, q, { Equipe_Dia: textoSeguro_(ordenarNomes_(equipe).join(', ')), Almoco_Turnos: textoSeguro_(validos.join('; ')), Almoco_Max: max });
     registrar_(u, 'Configurou escalas do dia', 'Escala', '', q.ID, 'Equipe: ' + (equipe.length || 'todos') + '; turnos: ' + (validos.join(', ') || 'padrão') + '; máx.: ' + (max || 'sem limite'));
     return resposta_(q.ID, { dados: escalaDiariaPara_(u, q, '') });
+  });
+}
+
+/* =========================================================================
+ * ESCALA MENSAL (1º horário, 2º horário ou Férias, dia a dia, de segunda a sexta)
+ * O dado é da pessoa: vale igual no quadro (só a equipe do quadro aparece) e na tela Equipe (todas as pessoas).
+ * "Férias" aqui é só um texto na grade: não mexe em Ausências nem no rodízio da escala semanal.
+ * ========================================================================= */
+
+/** Texto padrão do turno mensal ('1º horário', '2º horário', 'Férias') ou '' se não reconhecer. */
+function turnoMensal_(v) {
+  const n = normalizar_(v).replace(/^([12])o(horario)$/, '$1$2');   // aceita "1o horário" digitado à mão
+  if (n === '1horario' || n === '1') return TURNOS_MENSAL[0];
+  if (n === '2horario' || n === '2') return TURNOS_MENSAL[1];
+  if (n === 'ferias') return TURNOS_MENSAL[2];
+  return '';
+}
+
+function mesValido_(mes) {
+  const m = String(mes || '').trim();
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(m) ? m : hojeIso_().slice(0, 7);
+}
+
+/** quadroId vazio = tela Equipe (todas as pessoas, só ADM edita); com quadroId = equipe do quadro (quem edita o quadro edita). */
+function obterEscalaMensal(quadroId, mes) {
+  const u = usuarioAtual_();
+  let q = null;
+  if (quadroId) {
+    q = acharPorId_(lerTabela_('QUADROS'), quadroId);
+    if (!q || !ativo_(q.Ativo) || !podeVer_(u, q)) throw new Error('Quadro não encontrado.');
+  }
+  return escalaMensalPara_(u, q, mes);
+}
+
+function escalaMensalPara_(u, q, mes) {
+  const tz = fuso_();
+  const m = mesValido_(mes);
+  const ano = parseInt(m.slice(0, 4), 10);
+  const mm = parseInt(m.slice(5, 7), 10);
+  const fer = lerFeriados_(lerConfig_());
+  const dias = [];
+  for (let d = 1; d <= ultimoDiaDoMes_(ano, mm); d++) {
+    const iso = isoUtc_(ano, mm, d);
+    if (diaDaSemanaIso_(iso) <= 5) dias.push(iso);
+  }
+  const feriados = {};
+  dias.forEach(function (d) { if (ehFeriado_(d, fer)) feriados[d] = true; });
+  const porEmail = {};
+  lerTabela_('MENSAL').linhas.forEach(function (r) {
+    if (!ativo_(r.Ativo)) return;
+    const d = dataIso_(r.Data, tz);
+    if (d.slice(0, 7) !== m) return;
+    const t = turnoMensal_(r.Turno);
+    if (!t) return;
+    (porEmail[textoDe_(r.Email).toLowerCase()] = porEmail[textoDe_(r.Email).toLowerCase()] || {})[d] = t;
+  });
+  const equipe = q ? equipeDoDia_(q) : pessoasDaEquipe_();
+  const contagem = {};
+  dias.forEach(function (d) { contagem[d] = { primeiro: 0, segundo: 0, ferias: 0 }; });
+  const pessoas = equipe.slice().sort(function (a, b) { return normalizar_(a.nome) < normalizar_(b.nome) ? -1 : 1; }).map(function (p) {
+    const turnos = porEmail[p.email] || {};
+    Object.keys(turnos).forEach(function (d) {
+      const c = contagem[d];
+      if (!c) return;
+      if (turnos[d] === TURNOS_MENSAL[0]) c.primeiro++; else if (turnos[d] === TURNOS_MENSAL[1]) c.segundo++; else c.ferias++;
+    });
+    return { email: p.email, nome: p.nome, turnos: turnos, eu: igualEmail_(p.email, u.email) };
+  });
+  const ant = new Date(Date.UTC(ano, mm - 2, 1)).toISOString().slice(0, 7);
+  const prox = new Date(Date.UTC(ano, mm, 1)).toISOString().slice(0, 7);
+  return {
+    mes: m, mesAnterior: ant, proximoMes: prox, dias: dias, feriados: feriados, hoje: hojeIso_(), pessoas: pessoas, contagem: contagem,
+    turnos: TURNOS_MENSAL, quadroId: q ? q.ID : '', podeEditar: q ? podeEditar_(u, q) : u.perfil === 'ADM'
+  };
+}
+
+/** Marca o turno de uma pessoa num dia ('' tira a marcação). */
+function definirMensal(quadroId, email, dia, turno) {
+  const u = usuarioAtual_();
+  const iso = dataValida_(dia);
+  const bruto = String(turno === null || turno === undefined ? '' : turno).trim();
+  const valor = bruto ? turnoMensal_(bruto) : '';
+  if (bruto && !valor) throw new Error('Escolha 1º horário, 2º horário ou Férias.');
+  return comTrava_(function () {
+    let q = null;
+    if (quadroId) q = quadroEditavelDia_(u, quadroId); else exigirAdm_(u);
+    if (ehFeriado_(iso, lerFeriados_(lerConfig_()))) throw new Error('Esse dia é feriado.');
+    const equipe = q ? equipeDoDia_(q) : pessoasDaEquipe_();
+    const pessoa = equipe.filter(function (p) { return igualEmail_(p.email, email); })[0];
+    if (!pessoa) throw new Error(q ? 'Essa pessoa não está na equipe deste quadro.' : 'Pessoa não encontrada na equipe.');
+    const tz = fuso_();
+    const tm = lerTabela_('MENSAL');
+    const linhas = tm.linhas.filter(function (r) { return igualEmail_(r.Email, pessoa.email) && dataIso_(r.Data, tz) === iso; });
+    if (!valor) {
+      linhas.forEach(function (r) { if (ativo_(r.Ativo)) gravarCampos_(tm, r, { Ativo: 'Não' }); });
+    } else if (linhas.length) {
+      gravarCampos_(tm, linhas[0], { Turno: textoSeguro_(valor), Ativo: 'Sim' });
+      linhas.slice(1).forEach(function (r) { if (ativo_(r.Ativo)) gravarCampos_(tm, r, { Ativo: 'Não' }); });
+    } else {
+      inserir_(tm, {
+        ID: proximoId_(tm), Email: pessoa.email, Pessoa: textoSeguro_(pessoa.nome), Data: Utilities.parseDate(iso, tz, 'yyyy-MM-dd'),
+        Turno: textoSeguro_(valor), Ativo: 'Sim', Criado_em: new Date(), Criado_por: textoSeguro_(u.nome)
+      });
+    }
+    registrar_(u, valor ? 'Marcou escala mensal' : 'Tirou escala mensal', 'Escala mensal', '', q ? q.ID : '', pessoa.nome + ' em ' + iso.split('-').reverse().join('/') + (valor ? ': ' + valor : ''));
+    const dados = escalaMensalPara_(u, q, iso.slice(0, 7));
+    return q ? resposta_(q.ID, { dados: dados }) : { ok: true, dados: dados };
   });
 }
 
