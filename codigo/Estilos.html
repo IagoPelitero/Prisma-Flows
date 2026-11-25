@@ -142,9 +142,14 @@ input[disabled], select[disabled], textarea[disabled] { background: var(--lista-
   --av: #56607A;
   width: 26px; height: 26px; border-radius: 50%; flex: none;
   display: inline-grid; place-items: center;
-  background: var(--av); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, #fff 26%, var(--av)) 0%, var(--av) 62%, color-mix(in srgb, #000 18%, var(--av)) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em; line-height: 1;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .25); user-select: none;
 }
 .avatar.p { width: 22px; height: 22px; font-size: 10px; }
+.avatar.com-icone { font-size: 15px; letter-spacing: 0; text-shadow: none; }
+.avatar.p.com-icone { font-size: 13px; }
 .avatares { display: inline-flex; }
 .avatares .avatar { box-shadow: 0 0 0 2px var(--superficie); }
 .avatares .avatar + .avatar { margin-left: -3px; }
@@ -312,7 +317,7 @@ kbd {
 .quadro-listas {
   flex: 1; min-height: 0;
   display: flex; align-items: flex-start; gap: 12px;
-  overflow-x: auto; overflow-y: hidden; padding: 4px 20px 20px;
+  overflow-x: auto; overflow-y: auto; padding: 4px 20px 20px;
   scroll-padding: 0 20px;
 }
 .lista {
@@ -801,4 +806,42 @@ button.cel.home:hover { background: var(--primaria); color: var(--sobre-primaria
 .legenda .l-ms1 { background: var(--primaria-suave); border: 1px solid var(--primaria); }
 .legenda .l-ms2 { background: var(--ok-suave); border: 1px solid var(--ok); }
 .legenda .l-msf { background: var(--aviso-suave); border: 1px solid var(--aviso); }
+
+/* ---------- Altura das listas (alça na borda de baixo) ---------- */
+.lista-alca { flex: none; height: 12px; margin-top: -4px; display: grid; place-items: center; cursor: ns-resize; touch-action: none; border-radius: 0 0 12px 12px; }
+.lista-alca span { width: 36px; height: 4px; border-radius: 2px; background: var(--linha-forte); opacity: .55; transition: opacity .15s, background .15s, width .15s; }
+.lista-alca:hover span, .lista-alca:focus-visible span, body.redimensionando .lista-alca span { opacity: 1; width: 56px; background: var(--espectro); }
+.lista-alca:focus-visible { outline-offset: -2px; }
+.lista.lista-alta { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--espectro) 40%, transparent); }
+body.redimensionando, body.redimensionando * { cursor: ns-resize !important; user-select: none !important; }
+
+/* ---------- Lista recorrente: zerar atendimentos ---------- */
+.rec-zerar { font-size: 11.5px; font-weight: 600; margin-left: 4px; }
+.rec-pe-botoes { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ---------- Escala: avisos de configuração ---------- */
+.cfg-alerta { padding: 10px 12px; border-radius: 10px; background: var(--aviso-suave); color: var(--tinta); font-size: 13px; }
+
+/* ---------- Avatar: escolher cor e ícone ---------- */
+button.eu { border: 0; border-left: 1px solid var(--linha); background: transparent; color: inherit; border-radius: 0 10px 10px 0; padding: 4px 8px; text-align: left; }
+button.eu:hover { background: var(--lista-fundo); }
+button.eu .avatar { transition: transform .15s; }
+button.eu:hover .avatar { transform: scale(1.08); }
+.avatar-btn { border: 0; padding: 0; background: transparent; border-radius: 50%; display: inline-grid; }
+.avatar-btn:hover .avatar { box-shadow: 0 0 0 2px var(--primaria); }
+.adm-nome { display: flex; align-items: center; gap: 8px; }
+.av-previa { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px; background: var(--lista-fundo); }
+.av-previa .avatar { width: 56px; height: 56px; font-size: 20px; }
+.av-previa .avatar.com-icone { font-size: 30px; }
+.av-previa span { display: flex; flex-direction: column; }
+.av-previa small { color: var(--tinta-3); font-size: 12.5px; }
+.av-cores { display: flex; flex-wrap: wrap; gap: 8px; }
+.av-cor { --av: #56607A; width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; background: var(--av); box-shadow: inset 0 0 0 2px var(--superficie); color: #fff; font-size: 12px; font-weight: 700; }
+.av-cor[aria-checked="true"] { border-color: var(--tinta); }
+.av-cor.auto { background: repeating-linear-gradient(45deg, var(--av), var(--av) 5px, color-mix(in srgb, var(--av) 70%, #fff) 5px, color-mix(in srgb, var(--av) 70%, #fff) 10px); }
+.av-icones { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.av-icone { height: 40px; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); font-size: 20px; line-height: 1; }
+.av-icone.ini { font-size: 13px; font-weight: 700; color: var(--tinta-2); }
+.av-icone:hover { border-color: var(--linha-forte); }
+.av-icone[aria-checked="true"] { border-color: var(--primaria); background: var(--primaria-suave); box-shadow: 0 0 0 1px var(--primaria); }
 </style>

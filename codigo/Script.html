@@ -15,6 +15,10 @@
   var CORES_QUADRO = ['#6E4BD8', '#3B5BDB', '#1785BD', '#1F9467', '#C49000', '#DD6519', '#D23B3B', '#56607A'];
   var CORES_ETIQUETA = ['#2F9E44', '#E0A100', '#E8590C', '#D63939', '#7048E8', '#1C6ED4', '#0B8A8A', '#C2255C', '#5C677D'];
   var CORES_AVATAR = ['#5B4BC4', '#2F5BD3', '#16729F', '#1E7A58', '#7D6200', '#B04E16', '#B23A48', '#56607A'];
+  /* Mesma paleta e mesmos ícones que o servidor aceita (Code.gs: AVATAR_CORES e AVATAR_ICONES). */
+  var PALETA_AVATAR = ['#5B4BC4', '#2F5BD3', '#16729F', '#0B7A75', '#1E7A58', '#4D7C0F', '#7D6200', '#B04E16', '#B23A48', '#A3236E', '#7A3FA0', '#56607A'];
+  var ICONES_AVATAR = ['👒', '🏴‍☠️', '⚓', '🗺️', '🍖', '🍊', '⚔️', '🌊', '🔥', '⭐', '🌙', '☀️', '🌸', '🍀', '🐱', '🦊', '🐼', '🦁', '🐙', '🦈',
+    '🎧', '☕', '🚀', '💎', '🎯', '🎸', '📚', '🧠', '💡', '🏆'];
   var ROTULOS_CONFIG = {
     NOME_SISTEMA: 'Nome do sistema',
     SUBTITULO: 'Subtítulo',
@@ -101,8 +105,23 @@
     return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : '')).toUpperCase();
   }
   function hash(s) { var h = 0; s = String(s || ''); for (var i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; } return Math.abs(h); }
+  /* Avatar escolhido pela pessoa (aba Usuarios: Avatar_Cor e Avatar_Icone). Quem não é usuário fica com a cor automática. */
+  var avIndice = { lista: null, mapa: {} };
+  function estiloAvatar(nome) {
+    var lista = (typeof S !== 'undefined' && S.usuarios) || [];
+    if (avIndice.lista !== lista) {
+      avIndice = { lista: lista, mapa: {} };
+      lista.forEach(function (u) { avIndice.mapa[norm(u.nome)] = u; });
+    }
+    var u = avIndice.mapa[norm(nome)];
+    return { cor: (u && u.cor) || CORES_AVATAR[hash(norm(nome)) % CORES_AVATAR.length], icone: (u && u.icone) || '' };
+  }
+  function htmlAvatar(nome, pequeno, cor, icone) {
+    return '<span class="avatar' + (pequeno ? ' p' : '') + (icone ? ' com-icone' : '') + '" style="--av:' + esc(cor) + '" title="' + esc(nome) + '" aria-hidden="true">' + esc(icone || iniciais(nome)) + '</span>';
+  }
   function avatar(nome, pequeno) {
-    return '<span class="avatar' + (pequeno ? ' p' : '') + '" style="--av:' + CORES_AVATAR[hash(norm(nome)) % CORES_AVATAR.length] + '" title="' + esc(nome) + '" aria-hidden="true">' + esc(iniciais(nome)) + '</span>';
+    var e = estiloAvatar(nome);
+    return htmlAvatar(nome, pequeno, e.cor, e.icone);
   }
   function textoSobre(hex) {
     var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
@@ -401,7 +420,7 @@
       (u ? '<button type="button" class="btn sutil btn-topo' + (S.view === 'equipe' ? ' ativo' : '') + '" data-acao="ir-equipe" title="Home e presencial, férias e banco de horas" aria-label="Equipe' + (pendEq ? ', ' + plural(pendEq, 'pedido esperando resposta', 'pedidos esperando resposta') : '') + '"' + (S.view === 'equipe' ? ' aria-current="page"' : '') + '>' + I.equipe + '<span class="txt-btn">Equipe</span>' + (pendEq ? '<span class="selo" aria-hidden="true">' + pendEq + '</span>' : '') + '</button>' : '') +
       '<button type="button" class="icone-btn" data-acao="tema" title="Alternar tema claro e escuro" aria-label="Alternar tema">' + I.tema + '</button>' +
       (u && u.perfil === 'ADM' ? '<button type="button" class="icone-btn" data-acao="ir-admin" title="Pessoas e configurações" aria-label="Administração">' + I.pessoas + '</button>' : '') +
-      (u ? '<span class="eu" title="' + esc(u.email) + '">' + avatar(u.nome) + '<span><span class="eu-nome">' + esc(primeiroNome(u.nome)) + '</span> <span class="eu-perfil">' + esc(u.perfil) + '</span></span></span>' : '') +
+      (u ? '<button type="button" class="eu" data-acao="editar-avatar" data-email="' + esc(u.email) + '" title="' + esc(u.email) + ' · clique para mudar seu avatar" aria-label="Mudar seu avatar">' + avatar(u.nome) + '<span><span class="eu-nome">' + esc(primeiroNome(u.nome)) + '</span> <span class="eu-perfil">' + esc(u.perfil) + '</span></span></button>' : '') +
       '</div></header>';
   }
 
@@ -776,22 +795,65 @@
     }
     var vaziaDica = (!visiveis.length && !Q.podeEditar) ? '<p class="lista-vazia-dica">Nenhum cartão</p>' :
       (!visiveis.length && filtrosAtivos() && todos.length ? '<p class="lista-vazia-dica">Nenhum cartão com esses filtros</p>' : '');
-    return '<section class="lista" data-id="' + esc(l.id) + '" style="--espectro:' + corEspectro(i) + '" aria-label="Lista ' + esc(l.nome) + '">' +
+    return '<section class="lista' + (alturaLista(l.id) ? ' lista-alta' : '') + '" data-id="' + esc(l.id) + '" style="--espectro:' + corEspectro(i) + estiloAltura(l.id) + '" aria-label="Lista ' + esc(l.nome) + '">' +
       '<header class="lista-cabeca">' + nome + conta +
       (Q.podeEditar ? '<button type="button" class="icone-btn" data-acao="menu-lista" data-id="' + esc(l.id) + '" aria-label="Opções da lista ' + esc(l.nome) + '">' + I.pontos + '</button>' : '') +
       '</header>' + htmlVezDaLista(l) + vaziaDica +
       '<div class="lista-cartoes" data-lista="' + esc(l.id) + '">' + visiveis.map(htmlCartao).join('') + '</div>' +
-      (pe ? '<div class="lista-pe">' + pe + '</div>' : '') +
+      (pe ? '<div class="lista-pe">' + pe + '</div>' : '') + htmlAlca(l) +
       '</section>';
+  }
+
+  /* ---------- Altura das listas (preferência de cada navegador) ----------
+     Sem altura salva, a lista cabe na tela. Com altura, ela desce além da tela (o quadro ganha rolagem
+     vertical) e continua rolando por dentro. */
+  var ALTURA_MIN = 160;
+  function alturas() {
+    if (!S.alturas) {
+      try { S.alturas = JSON.parse(lerPref('alturas') || '{}') || {}; } catch (err) { S.alturas = {}; }
+    }
+    return S.alturas;
+  }
+  function alturaLista(id) { var h = parseInt(alturas()[id], 10); return h >= ALTURA_MIN ? h : 0; }
+  function definirAltura(id, h) {
+    var a = alturas();
+    if (h >= ALTURA_MIN) a[id] = Math.round(h); else delete a[id];
+    gravarPref('alturas', JSON.stringify(a));
+  }
+  function estiloAltura(id) {
+    var h = alturaLista(id);
+    return h ? ';height:' + h + 'px;max-height:none' : '';
+  }
+  function htmlAlca(l) {
+    return '<div class="lista-alca" data-alca="' + esc(l.id) + '" role="separator" aria-orientation="horizontal" tabindex="0"' +
+      ' aria-label="Altura da lista ' + esc(l.nome) + '. Arraste ou use as setas para cima e para baixo. Duplo clique ou Home volta ao tamanho da tela."' +
+      ' title="Arraste para baixo para aumentar a lista · duplo clique volta ao tamanho da tela"><span aria-hidden="true"></span></div>';
+  }
+
+  /** Posição de rolagem de cada lista (cartões, rotatividade e recorrente), para o redesenho não voltar ao topo. */
+  function guardarRolagens(cont) {
+    var g = { x: cont.scrollLeft, y: cont.scrollTop, listas: {} };
+    $$('.lista-cartoes, .rot-corpo, .rec-corpo', cont).forEach(function (el) {
+      var sec = el.closest('.lista');
+      if (sec && el.scrollTop) g.listas[sec.getAttribute('data-id') + '|' + el.className] = el.scrollTop;
+    });
+    return g;
+  }
+  function restaurarRolagens(cont, g) {
+    cont.scrollLeft = g.x;
+    cont.scrollTop = g.y;
+    $$('.lista-cartoes, .rot-corpo, .rec-corpo', cont).forEach(function (el) {
+      var sec = el.closest('.lista');
+      var y = sec && g.listas[sec.getAttribute('data-id') + '|' + el.className];
+      if (y) el.scrollTop = y;
+    });
   }
 
   function renderListas() {
     var cont = $('#listas');
     if (!cont || !S.quadro) return;
     var Q = S.quadro;
-    var scrollX = cont.scrollLeft;
-    var scrollY = {};
-    $$('.lista-cartoes', cont).forEach(function (el) { scrollY[el.getAttribute('data-lista')] = el.scrollTop; });
+    var rolagens = guardarRolagens(cont);
     var focoId = document.activeElement && document.activeElement.id;
 
     var html = Q.listas.map(htmlLista).join('');
@@ -804,8 +866,7 @@
     }
     if (!Q.listas.length && !Q.podeEditar) html = '<p class="texto-suave">Este quadro ainda não tem listas.</p>';
     cont.innerHTML = html;
-    cont.scrollLeft = scrollX;
-    $$('.lista-cartoes', cont).forEach(function (el) { var y = scrollY[el.getAttribute('data-lista')]; if (y) el.scrollTop = y; });
+    restaurarRolagens(cont, rolagens);
 
     var resumo = $('#filtro-resumo');
     if (resumo) {
@@ -902,11 +963,14 @@
   function menuLista(botao, id) {
     var l = lista(id);
     if (!l) return;
+    var itemAltura = alturaLista(id) ? [{ rotulo: 'Voltar a altura ao tamanho da tela', fn: function () { definirAltura(id, 0); renderListas(); } }] : [];
     if (l.tipo === 'Rotativa' || l.tipo === 'Recorrente') {
+      var temAtend = l.tipo === 'Recorrente' && filaRec(id).some(function (x) { return x.atendimentos > 0; });
       abrirMenu(botao, [
-        { rotulo: 'Renomear lista', fn: function () { S.editandoLista = id; renderListas(); var inp = $('#lista-nome-' + id); if (inp) { inp.focus(); inp.select(); } } },
-        { rotulo: 'Arquivar lista', perigo: true, fn: function () { arquivarLista(id); } }
-      ]);
+        { rotulo: 'Renomear lista', fn: function () { S.editandoLista = id; renderListas(); var inp = $('#lista-nome-' + id); if (inp) { inp.focus(); inp.select(); } } }
+      ].concat(temAtend ? [{ rotulo: 'Zerar atendimentos de todos', fn: function () { recZerar(id, ''); } }] : [])
+        .concat(itemAltura)
+        .concat([{ rotulo: 'Arquivar lista', perigo: true, fn: function () { arquivarLista(id); } }]));
       return;
     }
     abrirMenu(botao, [
@@ -922,9 +986,10 @@
             escrever('atualizarLista', id, { limite: l.limite || '' }).catch(function (e) { l.limite = antes; falhou(e); });
           });
       } },
-      { rotulo: 'Adicionar cartão', fn: function () { S.novoEm = id; S.rascunhoNovo = ''; renderListas(); } },
+      { rotulo: 'Adicionar cartão', fn: function () { S.novoEm = id; S.rascunhoNovo = ''; renderListas(); } }
+    ].concat(itemAltura).concat([
       { rotulo: 'Arquivar lista', perigo: true, fn: function () { arquivarLista(id); } }
-    ]);
+    ]));
   }
 
   function arquivarLista(id) {
@@ -1306,13 +1371,10 @@
         : '';
       return;
     }
-    if (!itens.length && !ed) { el.innerHTML = ''; return; }
-    if (!itens.length && !S.carrosselAberto) {
-      el.innerHTML = '<h3>Carrossel</h3><p class="ajuda">Rodízio de pessoas dentro do cartão, bom para revezar ligações. Quem atende marca <b>Atendi</b> e vai para o fim da fila; o primeiro da fila é a pessoa da vez.</p>' +
-        '<button type="button" class="btn" data-acao="carrossel-iniciar">' + I.carrossel + 'Transformar em carrossel</button>';
-      return;
-    }
-    var html = '<h3>Carrossel <span class="conta">' + plural(itens.length, 'pessoa', 'pessoas') + '</span></h3>';
+    // Não se cria mais carrossel em cartão (use uma lista Recorrente). Só aparece o carrossel que o cartão já tinha.
+    if (!itens.length) { el.innerHTML = ''; return; }
+    var html = '<h3>Carrossel <span class="conta">' + plural(itens.length, 'pessoa', 'pessoas') + '</span></h3>' +
+      '<p class="ajuda">Carrossel criado antes da versão 1.6. Para rodízios novos, use uma lista do tipo Recorrente.</p>';
     if (itens.length) {
       html += '<p class="vez-agora">Na vez agora ' + avatar(itens[0].pessoa, true) + '<b>' + esc(itens[0].pessoa) + '</b>' + (itens[0].texto ? '<span class="texto-suave">' + esc(itens[0].texto) + '</span>' : '') + '</p>';
       html += '<ol class="car-lista">' + itens.map(function (i, n) {
@@ -1470,11 +1532,11 @@
       : (ed
         ? '<h2 class="lista-nome editavel-nome" role="button" tabindex="0" data-acao="renomear-lista" data-id="' + esc(l.id) + '" title="Clique para renomear, arraste para mover">' + esc(l.nome) + '</h2>'
         : '<h2 class="lista-nome">' + esc(l.nome) + '</h2>');
-    return '<section class="lista lista-rodizio ' + (rot ? 'lista-rotativa' : 'lista-recorrente') + '" data-id="' + esc(l.id) + '" style="--espectro:' + corEspectro(i) + '" aria-label="Lista ' + esc(l.nome) + '">' +
+    return '<section class="lista lista-rodizio ' + (rot ? 'lista-rotativa' : 'lista-recorrente') + (alturaLista(l.id) ? ' lista-alta' : '') + '" data-id="' + esc(l.id) + '" style="--espectro:' + corEspectro(i) + estiloAltura(l.id) + '" aria-label="Lista ' + esc(l.nome) + '">' +
       '<header class="lista-cabeca">' + nome + '<span class="lista-conta" title="' + (rot ? 'Tarefas' : 'Pessoas na fila') + '">' + itens.length + '</span>' +
       (ed ? '<button type="button" class="icone-btn" data-acao="menu-lista" data-id="' + esc(l.id) + '" aria-label="Opções da lista ' + esc(l.nome) + '">' + I.pontos + '</button>' : '') +
       '</header><p class="lista-tipo">' + (rot ? I.rotina + 'Rotatividade semanal' : I.carrossel + 'Lista recorrente') + '</p>' +
-      (rot ? htmlCorpoRotativa(l, itens) : htmlCorpoRecorrente(l, itens)) + '</section>';
+      (rot ? htmlCorpoRotativa(l, itens) : htmlCorpoRecorrente(l, itens)) + htmlAlca(l) + '</section>';
   }
 
   /* --- Rotatividade semanal --- */
@@ -1496,7 +1558,7 @@
       S.usuarios.forEach(function (u) { if (nomes.map(norm).indexOf(norm(u.nome)) === -1) nomes.push(u.nome); });
       if (w.pessoa && nomes.map(norm).indexOf(norm(w.pessoa)) === -1) nomes.push(w.pessoa);
       var resp = ed
-        ? '<select class="rot-select' + (w.trocado ? ' trocado' : '') + '" data-rot-troca="' + esc(t.id) + '" data-semana="' + sem + '" aria-label="Quem cuida de ' + esc(t.tarefa) + '">' +
+        ? '<select id="rot-sel-' + esc(t.id) + '-' + sem + '" class="rot-select' + (w.trocado ? ' trocado' : '') + '" data-rot-troca="' + esc(t.id) + '" data-semana="' + sem + '" aria-label="Quem cuida de ' + esc(t.tarefa) + '">' +
           nomes.map(function (n, k) { return (k === t.pessoas.length && k < nomes.length ? '<option disabled>──────────</option>' : '') + '<option value="' + esc(n) + '"' + (norm(n) === norm(w.pessoa) ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>'
         : '<b>' + esc(w.pessoa || 'Ninguém') + '</b>';
       return '<div class="rot-item" data-tarefa="' + esc(t.id) + '">' +
@@ -1550,7 +1612,8 @@
   function modalTarefaRot(listaId, tarefaId) {
     var t = tarefaId ? rotTarefa(listaId, tarefaId) : null;
     var pessoas = t ? t.pessoas.slice() : [];
-    var inicio = t ? t.atual.pessoa : '';
+    // A troca da semana vale só para a semana: ao editar, o rodízio continua de onde estava.
+    var inicio = t ? (t.atual.doRodizio || t.atual.pessoa) : '';
     var m = abrirModal('<form data-form="pedir"><div class="modal-cabeca"><h2 id="modal-titulo">' + (t ? 'Editar tarefa' : 'Nova tarefa') + '</h2>' +
       '<p>A tarefa se repete todo dia útil. Escolha quem cuida dela e se o nome gira a cada semana.</p></div>' +
       '<div class="modal-corpo">' +
@@ -1562,7 +1625,8 @@
       '<div class="campo"><span class="rotulo">Pessoas, na ordem do rodízio</span><div id="tr-pessoas"></div>' +
       '<div class="form-carrossel"><select id="tr-add" aria-label="Escolher pessoa"></select><button type="button" class="btn" data-tr="add">Adicionar</button></div>' +
       '<div class="form-carrossel"><input type="text" id="tr-livre" maxlength="80" placeholder="Ou digite outro nome" aria-label="Outro nome"><button type="button" class="btn" data-tr="livre">Adicionar</button></div></div>' +
-      '<div class="campo"><label for="tr-inicio">Quem cuida desta semana</label><select id="tr-inicio"></select></div>' +
+      '<div class="campo"><label for="tr-inicio">Quem cuida desta semana pelo rodízio</label><select id="tr-inicio"></select>' +
+      (t && t.atual.trocado ? '<span class="ajuda">Nesta semana está trocado para ' + esc(t.atual.pessoa) + '. Se você mantiver ' + esc(t.atual.doRodizio) + ' aqui, a troca continua; escolhendo outra pessoa, o rodízio passa a contar a partir dela.</span>' : '') + '</div>' +
       '</div><div class="modal-rodape"><div class="direita"><button type="button" class="btn sutil" data-acao="fechar-modal">Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></div></form>');
     function desenhar() {
       $('#tr-pessoas').innerHTML = pessoas.length ? '<ol class="car-lista">' + pessoas.map(function (n, k) {
@@ -1626,6 +1690,7 @@
         '<ol class="car-lista">' + itens.map(function (i, n) {
           var pend = !!i.pendente;
           var info = i.atendimentos ? plural(i.atendimentos, 'atendimento', 'atendimentos') : 'Ainda não atendeu';
+          if (i.atendimentos && ed && !pend) info += ' <button type="button" class="link-texto rec-zerar" data-acao="rec-zerar" data-lista="' + lid + '" data-id="' + esc(i.id) + '" title="Voltar a contagem de ' + esc(i.pessoa) + ' para zero" aria-label="Zerar os atendimentos de ' + esc(i.pessoa) + '">zerar</button>';
           return '<li class="car-item' + (n === 0 ? ' na-vez' : '') + '">' +
             '<label class="car-atendi" title="Marque quando atender: a pessoa vai para o fim da fila"><input type="checkbox" data-acao="rec-atendi" data-lista="' + lid + '" data-id="' + esc(i.id) + '"' + (ed && !pend ? '' : ' disabled') + ' aria-label="Atendi: ' + esc(i.pessoa) + '"><span>Atendi</span></label>' +
             '<span class="car-pos">' + (n + 1) + 'º</span>' +
@@ -1642,9 +1707,40 @@
         '<datalist id="rec-sug-' + lid + '">' + S.usuarios.filter(function (u) { return jaNaFila.indexOf(norm(u.nome)) === -1; }).map(function (u) { return '<option value="' + esc(u.nome) + '"></option>'; }).join('') + '</datalist>' +
         '<input type="text" id="rec-texto-' + lid + '" data-rec-rascunho="texto:' + lid + '" placeholder="Texto (ex.: ramal)" maxlength="300" value="' + esc(S.rascunhoRec['texto:' + l.id] || '') + '" aria-label="Texto da pessoa">' +
         '<button type="submit" class="btn">Adicionar</button></form>' +
-        '<button type="button" class="btn sutil pequeno" data-acao="rec-equipe" data-lista="' + lid + '">' + I.equipe + 'Adicionar toda a equipe do quadro</button>'
+        '<div class="rec-pe-botoes"><button type="button" class="btn sutil pequeno" data-acao="rec-equipe" data-lista="' + lid + '">' + I.equipe + 'Adicionar toda a equipe</button>' +
+        (itens.some(function (i) { return i.atendimentos > 0 && !i.pendente; }) ? '<button type="button" class="btn sutil pequeno" data-acao="rec-zerar" data-lista="' + lid + '" title="Volta a contagem de atendimentos de todos para zero. A ordem da fila não muda.">' + I.atualizar + 'Zerar atendimentos</button>' : '') + '</div>'
       : '';
     return '<div class="rec-corpo">' + lista + '</div>' + (form ? '<div class="lista-pe rec-pe">' + form + '</div>' : '');
+  }
+
+  /** Zera a contagem de atendimentos de uma pessoa (itemId) ou da lista toda. A ordem da fila não muda. */
+  function recZerar(listaId, itemId) {
+    var itens = filaRec(listaId);
+    var alvos = itens.filter(function (x) { return (!itemId || x.id === itemId) && x.atendimentos > 0 && !x.pendente; });
+    if (!alvos.length) return;
+    var uma = !!itemId;
+    var pergunta = uma ? Promise.resolve(true) : confirmarAcao({
+      titulo: 'Zerar os atendimentos de todos?',
+      texto: plural(alvos.length, 'pessoa volta', 'pessoas voltam') + ' para 0 atendimentos. A ordem da fila continua a mesma. Dá para desfazer logo depois.',
+      confirmar: 'Zerar'
+    });
+    pergunta.then(function (ok) {
+      if (!ok) return;
+      var antes = {};
+      alvos.forEach(function (x) { antes[x.id] = x.atendimentos; x.atendimentos = 0; });
+      renderListas();
+      escrever('zerarAtendimentosLista', listaId, itemId || '').then(function (r) {
+        sincronizarRec(listaId, r);
+        var valores = r.antes || antes;
+        aviso(uma ? 'Atendimentos de ' + alvos[0].pessoa + ' zerados.' : 'Atendimentos da lista zerados.', { acao: { rotulo: 'Desfazer', fn: function () {
+          escrever('restaurarAtendimentosLista', listaId, valores).then(function (r2) { sincronizarRec(listaId, r2); }).catch(falhou);
+        } } });
+      }).catch(function (e) {
+        alvos.forEach(function (x) { x.atendimentos = antes[x.id]; });
+        renderListas();
+        falhou(e);
+      });
+    });
   }
 
   function recAtendi(listaId, itemId) {
@@ -2229,7 +2325,8 @@
     var abaAtiva = $('#escala-abas [aria-selected="true"]');
     if (abaAtiva) { try { abaAtiva.focus({ preventScroll: true }); } catch (err) { abaAtiva.focus(); } }
     m.scrollTop = 0;
-    if (e.ligada) carregarEscala('atual');
+    // Sempre busca de novo: listas criadas ou arquivadas depois de abrir o quadro precisam aparecer em Configurar.
+    carregarEscala('atual');
   }
 
   function carregarEscala(qual) {
@@ -2275,7 +2372,7 @@
       return '<button type="button" role="tab" aria-selected="' + (M.aba === a[0]) + '" data-esc="aba" data-valor="' + a[0] + '">' + a[1] + '</button>';
     }).join('');
     if (M.aba === 'ausencias') corpo.innerHTML = htmlEscalaAusencias();
-    else if (M.aba === 'config') corpo.innerHTML = htmlEscalaConfig();
+    else if (M.aba === 'config') corpo.innerHTML = M.carregando ? htmlCarregando('Buscando as listas e a equipe do quadro') : htmlEscalaConfig();
     else corpo.innerHTML = htmlEscalaSemana();
     var caixa = $('#modal-raiz .modal');
     if (caixa && !caixa.contains(document.activeElement)) {
@@ -2291,7 +2388,14 @@
       return '<div class="vazio"><h2>A escala está desligada neste quadro</h2><p>Marque quais listas são frentes e quem entra no rodízio. Toda segunda o Flows monta a semana e entrega os casos novos para quem está na vez.</p>' +
         (e.podeAdministrar ? '<button type="button" class="btn primario" data-esc="aba" data-valor="config">Configurar escala</button>' : '') + '</div>';
     }
-    if (!e.ativa) return '<p class="texto-suave">Falta marcar pelo menos uma frente e uma pessoa na equipe. Vá em Configurar.</p>';
+    if (!e.ativa) {
+      var faltas = [];
+      if (!(e.frentes || []).length) faltas.push('Nenhuma lista está marcada como frente. Se a lista que era frente foi arquivada, marque outra.');
+      if (!(e.equipe || []).length) faltas.push('Ninguém está na equipe do rodízio.');
+      if (!faltas.length) faltas.push('Falta marcar pelo menos uma frente e uma pessoa na equipe.');
+      return '<div class="vazio"><h2>A escala ainda não pode ser montada</h2>' + faltas.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') +
+        (e.podeAdministrar ? '<button type="button" class="btn primario" data-esc="aba" data-valor="config">Ir para Configurar</button>' : '<p>Peça para o dono do quadro ou um ADM ajustar em Configurar.</p>') + '</div>';
+    }
     var topo = '<div class="escala-topo"><div class="segmentado" role="group" aria-label="Semana">' +
       '<button type="button" data-esc="semana" data-valor="atual" aria-pressed="' + (M.qual === 'atual') + '">Esta semana</button>' +
       '<button type="button" data-esc="semana" data-valor="proxima" aria-pressed="' + (M.qual === 'proxima') + '">Próxima semana</button></div>' +
@@ -2356,18 +2460,29 @@
     (e.listas || []).forEach(function (l) { if (l.frente) frentes[l.id] = l.vagas || ''; });
     var naEquipe = {};
     (e.equipe || []).forEach(function (n) { naEquipe[norm(n)] = true; });
-    return '<form class="escala-config" data-esc-form="config">' +
-      '<label class="alternar"><input type="checkbox" id="cfg-esc-ativa"' + (e.ligada ? ' checked' : '') + '>Usar a escala da semana neste quadro</label>' +
-      '<section><h3>Frentes</h3><p class="ajuda">Marque as listas que recebem demandas. Cartão novo sem responsável que entra numa frente vai para quem está na vez. Vagas em branco dividem igualmente.</p>' +
-      '<div class="cfg-frentes">' + (e.listas || []).filter(listaNormal).map(function (l) {
+    // Listas que podem ser frente: as normais que estão no quadro agora (inclui as criadas depois de abrir a tela).
+    var doServidor = {};
+    (e.listas || []).forEach(function (l) { doServidor[l.id] = l; });
+    var opcoes = ((S.quadro && S.quadro.listas) || e.listas || []).filter(function (l) {
+      var s = doServidor[l.id];
+      return listaNormal(s || l) && !String(l.id).match(/^tmp-/);
+    });
+    var candidatos = e.candidatos || [];
+    var htmlFrentes = opcoes.length
+      ? '<div class="cfg-frentes">' + opcoes.map(function (l) {
         var marcada = Object.prototype.hasOwnProperty.call(frentes, l.id);
         return '<div class="cfg-frente"><label class="alternar"><input type="checkbox" data-cfg-frente="' + esc(l.id) + '"' + (marcada ? ' checked' : '') + '>' + esc(l.nome) + '</label>' +
           '<label class="cfg-vagas">Vagas <input type="number" min="1" step="1" data-cfg-vagas="' + esc(l.id) + '" value="' + esc(marcada ? frentes[l.id] : '') + '" placeholder="igual"' + (marcada ? '' : ' disabled') + '></label></div>';
-      }).join('') + '</div></section>' +
+      }).join('') + '</div>'
+      : '<p class="cfg-alerta">Este quadro não tem nenhuma <b>lista normal</b> (que recebe cartões). Listas de Rotatividade semanal e Recorrente não podem ser frente. Crie uma lista normal no quadro e volte aqui.</p>';
+    return '<form class="escala-config" data-esc-form="config">' +
+      '<label class="alternar"><input type="checkbox" id="cfg-esc-ativa"' + (e.ligada ? ' checked' : '') + '>Usar a escala da semana neste quadro</label>' +
+      '<section><h3>Frentes</h3><p class="ajuda">Marque as listas que recebem demandas. Cartão novo sem responsável que entra numa frente vai para quem está na vez. Vagas em branco dividem igualmente.</p>' +
+      htmlFrentes + '</section>' +
       '<section><h3>Equipe do rodízio</h3><p class="ajuda">Aparecem as pessoas que veem este quadro e podem editar. Quem é Leitor não entra.</p>' +
-      '<div class="lista-marcar">' + (e.candidatos || []).map(function (n) {
+      (candidatos.length ? '<div class="lista-marcar">' + candidatos.map(function (n) {
         return '<label><input type="checkbox" data-cfg-pessoa="' + esc(n) + '"' + (naEquipe[norm(n)] ? ' checked' : '') + '>' + avatar(n, true) + esc(n) + '</label>';
-      }).join('') + '</div></section>' +
+      }).join('') + '</div>' : '<p class="cfg-alerta">Ninguém pode entrar no rodízio deste quadro: só aparecem pessoas ativas, que veem o quadro e não são Leitor. Ajuste em Administração.</p>') + '</section>' +
       '<div class="cfg-salvar"><button type="submit" class="btn primario">Salvar configuração</button>' +
       '<span class="ajuda">Salvar refaz a escala desta semana e da próxima. Os casos já recebidos continuam contando.</span></div></form>';
   }
@@ -2393,6 +2508,11 @@
     if (t.hasAttribute('data-cfg-frente')) {
       var v = $('[data-cfg-vagas="' + t.getAttribute('data-cfg-frente') + '"]');
       if (v) { v.disabled = !t.checked; if (!t.checked) v.value = ''; }
+    }
+    // Quem escolhe frente ou pessoa quer usar a escala: liga a caixa sozinho (antes salvava desligada sem avisar).
+    if ((t.hasAttribute('data-cfg-frente') || t.hasAttribute('data-cfg-pessoa')) && t.checked) {
+      var usar = $('#cfg-esc-ativa');
+      if (usar) usar.checked = true;
     }
   }
 
@@ -2420,7 +2540,9 @@
         }),
         equipe: $$('[data-cfg-pessoa]', f).filter(function (c) { return c.checked; }).map(function (c) { return c.getAttribute('data-cfg-pessoa'); })
       };
-      if (cfg.ativa && (!cfg.frentes.length || !cfg.equipe.length)) { aviso('Marque pelo menos uma frente e uma pessoa.', { erro: true }); return; }
+      if (cfg.ativa && !$$('[data-cfg-frente]', f).length) { aviso('Este quadro não tem lista normal para ser frente. Crie uma lista normal (que recebe cartões) e volte aqui.', { erro: true }); return; }
+      if (cfg.ativa && !cfg.frentes.length) { aviso('Marque pelo menos uma lista como frente.', { erro: true }); return; }
+      if (cfg.ativa && !cfg.equipe.length) { aviso('Marque pelo menos uma pessoa na equipe do rodízio.', { erro: true }); return; }
       botao.disabled = true;
       escrever('salvarConfigEscala', S.quadro.quadro.id, cfg).then(function (r) {
         M.dados = r.escala;
@@ -3579,7 +3701,9 @@
     if (S.admin) {
       elP.innerHTML = '<div class="rolagem-x"><table class="pessoas"><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Ativo</th></tr></thead><tbody>' +
         S.admin.usuarios.map(function (u) {
-          return '<tr data-email="' + esc(u.email) + '"><td><input type="text" value="' + esc(u.nome) + '" data-adm="nome" maxlength="80" aria-label="Nome de ' + esc(u.email) + '"></td>' +
+          return '<tr data-email="' + esc(u.email) + '"><td><span class="adm-nome">' +
+            (u.ativo ? '<button type="button" class="avatar-btn" data-acao="editar-avatar" data-email="' + esc(u.email) + '" title="Mudar o avatar de ' + esc(u.nome) + '" aria-label="Mudar o avatar de ' + esc(u.nome) + '">' + avatar(u.nome) + '</button>' : avatar(u.nome)) +
+            '<input type="text" value="' + esc(u.nome) + '" data-adm="nome" maxlength="80" aria-label="Nome de ' + esc(u.email) + '"></span></td>' +
             '<td class="email">' + esc(u.email) + (u.voce ? ' <span class="chip">você</span>' : '') + '</td>' +
             '<td><select data-adm="perfil" aria-label="Perfil">' + S.perfis.map(function (p) { return '<option' + (p === u.perfil ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select></td>' +
             '<td><label class="alternar"><input type="checkbox" data-adm="ativo"' + (u.ativo ? ' checked' : '') + '><span class="so-leitor">Ativo</span></label></td></tr>';
@@ -3622,6 +3746,51 @@
       if (email === S.usuario.email) { S.usuario.nome = dados.nome || S.usuario.nome; }
       aviso('Pessoa salva.');
     }).catch(function (e) { aviso(msgErro(e), { erro: true }); renderAdminCorpo(); });
+  }
+
+  /* ------------------------------------------------------------------
+     Avatar: cor e ícone de cada pessoa
+     ------------------------------------------------------------------ */
+  function modalAvatar(email) {
+    email = String(email || (S.usuario && S.usuario.email) || '').toLowerCase();
+    var p = S.usuarios.filter(function (u) { return u.email === email; })[0];
+    if (!p) { aviso('Só dá para escolher avatar de quem está ativo.', { erro: true }); return; }
+    var eu = S.usuario && email === S.usuario.email;
+    var escolha = { cor: p.cor || '', icone: p.icone || '' };
+    var m = abrirModal('<form data-form="pedir"><div class="modal-cabeca"><h2 id="modal-titulo">' + (eu ? 'Seu avatar' : 'Avatar de ' + esc(p.nome)) + '</h2>' +
+      '<p>Aparece nos cartões, nas filas, na escala e nos comentários. Todo mundo vê o mesmo.</p></div>' +
+      '<div class="modal-corpo"><div class="av-previa" id="av-previa"></div>' +
+      '<div class="campo"><span class="rotulo">Cor</span><div class="av-cores" role="radiogroup" aria-label="Cor do avatar" id="av-cores"></div></div>' +
+      '<div class="campo"><span class="rotulo">Ícone</span><div class="av-icones" role="radiogroup" aria-label="Ícone do avatar" id="av-icones"></div></div>' +
+      '</div><div class="modal-rodape"><div class="direita"><button type="button" class="btn sutil" data-acao="fechar-modal">Cancelar</button><button type="submit" class="btn primario">Salvar avatar</button></div></div></form>');
+    function desenhar() {
+      var auto = CORES_AVATAR[hash(norm(p.nome)) % CORES_AVATAR.length];
+      var cor = escolha.cor || auto;
+      $('#av-previa').innerHTML = htmlAvatar(p.nome, false, cor, escolha.icone) + '<span><b>' + esc(p.nome) + '</b><small>' + (escolha.icone ? 'Ícone ' + esc(escolha.icone) : 'Iniciais do nome') + ' · ' + (escolha.cor ? 'cor escolhida' : 'cor automática') + '</small></span>';
+      $('#av-cores').innerHTML = '<button type="button" class="av-cor auto" data-av-cor="" role="radio" aria-checked="' + !escolha.cor + '" title="Automática" aria-label="Cor automática" style="--av:' + auto + '">A</button>' +
+        PALETA_AVATAR.map(function (c) { return '<button type="button" class="av-cor" data-av-cor="' + c + '" role="radio" aria-checked="' + (escolha.cor === c) + '" aria-label="Cor ' + c + '" style="--av:' + c + '"></button>'; }).join('');
+      $('#av-icones').innerHTML = '<button type="button" class="av-icone ini" data-av-icone="" role="radio" aria-checked="' + !escolha.icone + '" title="Iniciais do nome" aria-label="Iniciais do nome">' + esc(iniciais(p.nome)) + '</button>' +
+        ICONES_AVATAR.map(function (i) { return '<button type="button" class="av-icone" data-av-icone="' + esc(i) + '" role="radio" aria-checked="' + (escolha.icone === i) + '" aria-label="Ícone ' + esc(i) + '">' + esc(i) + '</button>'; }).join('');
+    }
+    desenhar();
+    m.addEventListener('click', function (ev) {
+      var c = ev.target.closest('[data-av-cor]');
+      var i = ev.target.closest('[data-av-icone]');
+      if (c) { escolha.cor = c.getAttribute('data-av-cor'); desenhar(); }
+      if (i) { escolha.icone = i.getAttribute('data-av-icone'); desenhar(); }
+    });
+    m.querySelector('form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var b = m.querySelector('button[type="submit"]');
+      b.disabled = true;
+      api('salvarAvatar', email, escolha).then(function (r) {
+        S.usuarios = r.ativos || S.usuarios;
+        fecharModal();
+        render();
+        if (S.cartaoAberto) renderGaveta();
+        aviso(eu ? 'Avatar salvo. Ficou ótimo!' : 'Avatar de ' + p.nome + ' salvo.');
+      }).catch(function (e) { b.disabled = false; aviso(msgErro(e), { erro: true }); });
+    });
   }
 
   /* ------------------------------------------------------------------
@@ -3850,6 +4019,67 @@
   document.addEventListener('contextmenu', function (ev) { if (ARR) ev.preventDefault(); });
   document.addEventListener('dragstart', function (ev) { if (ev.target.closest && ev.target.closest('#listas')) ev.preventDefault(); });
 
+  /* ---------- Alça de altura da lista ---------- */
+  var ALCA = null;
+  document.addEventListener('pointerdown', function (ev) {
+    var alca = ev.target.closest && ev.target.closest('.lista-alca');
+    if (!alca || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+    var sec = alca.closest('.lista');
+    if (!sec) return;
+    ev.preventDefault();
+    ALCA = { id: alca.getAttribute('data-alca'), sec: sec, y0: ev.clientY, h0: sec.getBoundingClientRect().height, ponteiro: ev.pointerId, cont: $('#listas') };
+    ALCA.rol0 = ALCA.cont ? ALCA.cont.scrollTop : 0;
+    document.body.classList.add('redimensionando');
+    try { alca.setPointerCapture(ev.pointerId); } catch (err) { /* ok */ }
+  });
+  document.addEventListener('pointermove', function (ev) {
+    if (!ALCA || ev.pointerId !== ALCA.ponteiro) return;
+    ev.preventDefault();
+    var c = ALCA.cont;
+    // perto da borda de baixo do quadro, rola junto para dar para puxar a lista além da tela
+    if (c) {
+      var r = c.getBoundingClientRect();
+      if (ev.clientY > r.bottom - 28) c.scrollTop += 14;
+    }
+    var h = Math.max(ALTURA_MIN, ALCA.h0 + (ev.clientY - ALCA.y0) + (c ? c.scrollTop - ALCA.rol0 : 0));
+    ALCA.h = h;
+    ALCA.sec.style.height = h + 'px';
+    ALCA.sec.style.maxHeight = 'none';
+  });
+  function soltarAlca(ev) {
+    if (!ALCA || ev.pointerId !== ALCA.ponteiro) return;
+    var a = ALCA;
+    ALCA = null;
+    document.body.classList.remove('redimensionando');
+    if (a.h) { definirAltura(a.id, a.h); ignorarCliqueAte = Date.now() + 60; renderListas(); }
+  }
+  document.addEventListener('pointerup', soltarAlca);
+  document.addEventListener('pointercancel', soltarAlca);
+  document.addEventListener('dblclick', function (ev) {
+    var alca = ev.target.closest && ev.target.closest('.lista-alca');
+    if (!alca) return;
+    definirAltura(alca.getAttribute('data-alca'), 0);
+    renderListas();
+    aviso('A lista voltou ao tamanho da tela.');
+  });
+  document.addEventListener('keydown', function (ev) {
+    var alca = ev.target.closest && ev.target.closest('.lista-alca');
+    if (!alca) return;
+    var id = alca.getAttribute('data-alca');
+    var sec = alca.closest('.lista');
+    var atual = alturaLista(id) || (sec ? Math.round(sec.getBoundingClientRect().height) : 400);
+    var nova = null;
+    if (ev.key === 'ArrowDown') nova = atual + 40;
+    else if (ev.key === 'ArrowUp') nova = Math.max(ALTURA_MIN, atual - 40);
+    else if (ev.key === 'Home') nova = 0;
+    if (nova === null) return;
+    ev.preventDefault();
+    definirAltura(id, nova);
+    renderListas();
+    var de = document.querySelector('.lista-alca[data-alca="' + id + '"]');
+    if (de) de.focus();
+  });
+
   /* ------------------------------------------------------------------
      Eventos delegados
      ------------------------------------------------------------------ */
@@ -3889,11 +4119,12 @@
     'rec-editar': function (el) { recEditar(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
     'rec-remover': function (el) { recRemover(el.getAttribute('data-lista'), el.getAttribute('data-id')); },
     'rec-equipe': function (el) { recEquipe(el.getAttribute('data-lista')); },
-    'dia-almoco': function () { abrirModalDia('almoco'); },
+    'rec-zerar': function (el) { recZerar(el.getAttribute('data-lista'), el.getAttribute('data-id') || ''); },
+    'editar-avatar': function (el) { modalAvatar(el.getAttribute('data-email')); },
+    'altura-lista': function (el) { definirAltura(el.getAttribute('data-id'), 0); renderListas(); },    'dia-almoco': function () { abrirModalDia('almoco'); },
     'dia-home': function () { abrirModalDia('home'); },
     'dia-mensal': function () { abrirModalDia('mensal'); },
     'eq-mes': function (el) { navegarMes('equipe', el.getAttribute('data-valor')); },
-    'carrossel-iniciar': function () { S.carrosselAberto = true; renderSecaoCarrossel(); var i = $('#car-pessoa'); if (i) i.focus(); },
     'carrossel-atendi': function (el) { carrosselAtendi(el.getAttribute('data-id')); },
     'carrossel-na-vez': function (el) { carrosselNaVez(el.getAttribute('data-id')); },
     'carrossel-editar': function (el) { carrosselEditar(el.getAttribute('data-id')); },

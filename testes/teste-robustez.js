@@ -8,7 +8,14 @@ api.salvarConfigEscala(q, { ativa: true, frentes: [{ id: L, vagas: 2 }], equipe:
 api.adicionarComentario(ct, 'comentário'); api.salvarEtiqueta(q, { nome: 'Teste', cor: '#112233' });
 api.salvarRotina({ nome: 'Rotina {mes}', quadroId: q, listaId: L, frequencia: 'Dias úteis', ativo: true });
 api.solicitarHoras({ tipo: 'Crédito', data: '2026-10-05', duracao: '1h', descricao: 'x' });
-api.adicionarParticipante(ct, 'Ana Souza', 'x');
+// carrossel antigo (desde a 1.6.0 não se cria carrossel novo pela tela): grava direto na aba, como um dado de antes
+(function () {
+  var cab = __sheets.Carrossel.d[0];
+  __sheets.Carrossel.appendRow(cab.map(function (h) { return ({ ID: 'CR-0001', Cartao_ID: ct, Pessoa: 'Ana Souza', Texto: 'x', Ordem: 1000, Atendimentos: 0, Ativo: 'Sim' })[h] || ''; }));
+  var cc = __sheets.Cartoes.d[0], linha = __sheets.Cartoes.d.filter(function (r) { return r[cc.indexOf('ID')] === ct; })[0];
+  linha[cc.indexOf('Carrossel_Total')] = 1; linha[cc.indexOf('Carrossel_Vez')] = 'Ana Souza';
+})();
+api.adicionarParticipante(ct, 'Bruno Lima', 'y');
 var nomes = Object.keys(__novo()).filter(function (k) { return /^[a-z][A-Za-z0-9]*$/.test(k) && typeof __novo()[k] === 'function'; });
 var pular = { doGet: 1, onOpen: 1, onEdit: 1, mostrarLink: 1, prepararEstrutura: 1, ativarRotinasDiarias: 1, ativarGatilhoRotinas: 1, desativarGatilhoRotinas: 1, gerarRotinasDoDia: 1 };
 var pool = [undefined, null, '', ' ', 'x', 'QD-0001', 'CT-0001', 'LS-0001', 'ET-0001', 'CK-0001', 'CM-0001', 'RT-0001', 'CR-0001', 0, -1, 1e9, NaN, true, false, {}, [], { nome: {} }, { a: 1 }, 'a'.repeat(60000), '=1+1', "'", '<script>alert(1)</script>', { titulo: null, nome: null }, [null], [{}], '2026-02-30', '31/12/2026', { dia: 'x' }];

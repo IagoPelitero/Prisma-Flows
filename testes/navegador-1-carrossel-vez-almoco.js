@@ -46,13 +46,20 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
     ok(true, 'duplicar cria "(cópia)" na lista');
     const titulos = await page.locator('.lista >> nth=0').locator('.cartao-titulo').allTextContents();
     ok(titulos.join('|') === 'Ligar para o cliente 7781|Ligar para o cliente 7781 (cópia)', 'cópia fica logo abaixo: ' + titulos.join('|'));
+    ok(await page.locator('.cartao:has-text("(cópia)") .sinal.carrossel').count() === 0, 'a cópia não ganha o selo "Vez" por fora do cartão');
+    ok(await page.locator('[data-acao="carrossel-iniciar"]').count() === 0 && (await page.locator('#g-carrossel').innerHTML()) === '', 'cartão novo não oferece mais "Transformar em carrossel"');
+    await page.keyboard.press('Escape');
   });
 
   // ---------- carrossel ----------
   await passo('carrossel', async () => {
-    await page.waitForSelector('#g-carrossel [data-acao="carrossel-iniciar"]', { timeout: 8000 });
-    await page.click('[data-acao="carrossel-iniciar"]');
-    for (const [nome, texto] of [['Ana Souza', 'ramal 2201'], ['Bruno Lima', 'ramal 2202'], ['Carla Mendes', '']]) {
+    // carrossel antigo (criado antes da 1.6.0) no cartão da semente: continua funcionando
+    await page.goto(BASE + '/?u=ana.souza@t.com&quadro=QD-0001');
+    await page.waitForSelector('.cartao:has-text("Cartão que já existia")');
+    await page.click('.cartao:has-text("Cartão que já existia")');
+    await page.waitForSelector('#g-carrossel .car-item:has-text("Ana Souza")', { timeout: 8000 });
+    ok((await page.locator('#g-carrossel').innerText()).includes('Lista recorrente') || (await page.locator('#g-carrossel').innerText()).includes('Recorrente'), 'carrossel antigo avisa que os novos rodízios ficam na lista Recorrente');
+    for (const [nome, texto] of [['Bruno Lima', 'ramal 2202'], ['Carla Mendes', '']]) {
       await page.fill('#car-pessoa', nome); await page.fill('#car-texto', texto);
       await page.click('.form-carrossel button[type="submit"]');
       await page.waitForSelector('.car-item:has-text("' + nome + '")', { timeout: 8000 });
@@ -60,14 +67,14 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
     const nomes = () => page.locator('.car-item .car-nome b').allTextContents();
     ok((await nomes()).join() === 'Ana Souza,Bruno Lima,Carla Mendes', 'fila na ordem de entrada');
     ok((await page.locator('.vez-agora b').textContent()) === 'Ana Souza', 'bloco "Na vez agora" mostra Ana');
-    ok((await page.locator('.cartao:has-text("Ligar para o cliente 7781") .sinal.carrossel').first().textContent()).includes('Ana'), 'o cartão no quadro mostra o selo "Vez: Ana"');
+    ok((await page.locator('.cartao:has-text("Cartão que já existia") .sinal.carrossel').first().textContent()).includes('Ana'), 'o cartão no quadro mostra o selo "Vez: Ana"');
     await page.click('.car-item:has-text("Ana Souza") input[type="checkbox"]');
     await page.waitForFunction(() => document.querySelector('.car-item .car-nome b').textContent === 'Bruno Lima');
     ok((await nomes()).join() === 'Bruno Lima,Carla Mendes,Ana Souza', 'marcar "Atendi" manda a Ana para o fim: ' + (await nomes()).join());
     ok(!(await page.locator('.car-item input:checked').count()), 'o flag volta desmarcado');
-    await espera(900);
+    await page.waitForFunction(() => /foi para o fim da fila/.test(document.querySelector('#avisos') ? document.querySelector('#avisos').textContent : ''), null, { timeout: 8000 }).catch(() => {});
     ok((await toast()).includes('Ana Souza foi para o fim da fila'), 'aviso: "' + (await toast()).slice(0, 80) + '"');
-    ok((await page.locator('.cartao:has-text("Ligar para o cliente 7781") .sinal.carrossel').first().textContent()).includes('Bruno'), 'selo no quadro agora mostra Bruno');
+    ok((await page.locator('.cartao:has-text("Cartão que já existia") .sinal.carrossel').first().textContent()).includes('Bruno'), 'selo no quadro agora mostra Bruno');
     await page.click('#avisos .aviso button:has-text("Desfazer")');
     await page.waitForFunction(() => document.querySelector('.car-item .car-nome b').textContent === 'Ana Souza', null, { timeout: 8000 });
     ok((await nomes()).join() === 'Ana Souza,Bruno Lima,Carla Mendes', 'Desfazer devolve a ordem');

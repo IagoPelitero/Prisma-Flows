@@ -13,7 +13,7 @@
  * - Toda gravação passa por LockService para duas pessoas não pisarem uma na outra.
  */
 
-const SCHEMA_VERSION = '1.5.0';
+const SCHEMA_VERSION = '1.6.0';
 
 const ABAS = {
   QUADROS: {
@@ -65,7 +65,7 @@ const ABAS = {
   },
   USUARIOS: {
     nome: 'Usuarios',
-    colunas: ['Email', 'Nome', 'Perfil', 'Ativo', 'Criado_em', 'Home_Dias']
+    colunas: ['Email', 'Nome', 'Perfil', 'Ativo', 'Criado_em', 'Home_Dias', 'Avatar_Cor', 'Avatar_Icone']
   },
   CONFIG: {
     nome: 'Config',
@@ -115,6 +115,10 @@ const CONFIG_PADRAO = [
 
 const PERFIS = ['ADM', 'Membro', 'Leitor'];
 const LIMITE_CARROSSEL = 60;
+/* Avatar: cor de fundo e ícone escolhidos pela pessoa. Ícone vazio = iniciais do nome. */
+const AVATAR_CORES = ['#5B4BC4', '#2F5BD3', '#16729F', '#0B7A75', '#1E7A58', '#4D7C0F', '#7D6200', '#B04E16', '#B23A48', '#A3236E', '#7A3FA0', '#56607A'];
+const AVATAR_ICONES = ['👒', '🏴‍☠️', '⚓', '🗺️', '🍖', '🍊', '⚔️', '🌊', '🔥', '⭐', '🌙', '☀️', '🌸', '🍀', '🐱', '🦊', '🐼', '🦁', '🐙', '🦈',
+  '🎧', '☕', '🚀', '💎', '🎯', '🎸', '📚', '🧠', '💡', '🏆'];
 const TIPOS_LISTA = ['Normal', 'Rotativa', 'Recorrente'];
 const TURNOS_MENSAL = ['1º horário', '2º horário', 'Férias'];
 const TURNOS_ALMOCO_PADRAO = ['11:30', '12:00', '12:30', '13:00'];
@@ -646,7 +650,7 @@ function duplicarCartao(cartaoId) {
       Responsaveis: textoSeguro_(textoDe_(c.Responsaveis)), Prazo: ehData_(c.Prazo) ? c.Prazo : '',
       Prioridade: prioridadeValida_(c.Prioridade), Etiquetas: separar_(c.Etiquetas).join(', '), Ordem: numOrdem_(c),
       Concluido: 'Não', Concluido_em: '', Ativo: 'Sim', Criado_em: agora, Criado_por: u.nome,
-      Atualizado_em: agora, Atualizado_por: u.nome, Carrossel_Total: c.Carrossel_Total, Carrossel_Vez: textoSeguro_(textoDe_(c.Carrossel_Vez))
+      Atualizado_em: agora, Atualizado_por: u.nome, Carrossel_Total: '', Carrossel_Vez: ''
     };
     tc.extras.forEach(function (cab) {
       const v = c._extras ? c._extras[cab] : '';
@@ -675,13 +679,7 @@ function duplicarCartao(cartaoId) {
         };
       })).map(itemParaCliente_);
 
-    const tcr = lerTabela_('CARROSSEL');
-    inserirVarios_(tcr, participantesDoCartao_(tcr, c.ID).map(function (p, n) {
-      return {
-        ID: proximoId_(tcr), Cartao_ID: copia.ID, Pessoa: textoSeguro_(textoDe_(p.Pessoa)), Texto: textoSeguro_(textoDe_(p.Texto)), Ordem: (n + 1) * 1000,
-        Atendimentos: 0, Ativo: 'Sim', Criado_em: agora, Criado_por: u.nome
-      };
-    }));
+    // O carrossel não vai para a cópia: cartão novo não tem mais carrossel (versão 1.6.0).
 
     registrar_(u, 'Duplicou cartão', 'Cartão', copia.ID, ctx.quadro.ID, 'Cópia de ' + c.ID + ': ' + textoDe_(c.Titulo));
     return resposta_(ctx.quadro.ID, {
@@ -896,12 +894,21 @@ function respostaCarrossel_(u, cx, extra) {
   return resposta_(cx.ctx.quadro.ID, r);
 }
 
+/**
+ * Desde a versão 1.6.0 não se cria carrossel novo em cartão (use uma lista Recorrente).
+ * Cartão que já tinha carrossel continua funcionando: dá para incluir, tirar e passar a vez.
+ */
+function exigirCarrosselExistente_(cx) {
+  if (!cx.fila.length) throw new Error('Não é mais possível criar carrossel em cartões. Para rodízio de pessoas, use uma lista do tipo Recorrente.');
+}
+
 function adicionarParticipante(cartaoId, pessoa, texto) {
   const u = usuarioAtual_();
   const nome = textoLimpo_(pessoa, 80);
   if (!nome) throw new Error('Escreva o nome de quem entra no carrossel.');
   return comTrava_(function () {
     const cx = contextoCarrossel_(u, cartaoId);
+    exigirCarrosselExistente_(cx);
     if (cx.fila.length >= LIMITE_CARROSSEL) throw new Error('O carrossel aceita até ' + LIMITE_CARROSSEL + ' pessoas.');
     if (cx.fila.some(function (x) { return normalizar_(x.Pessoa) === normalizar_(nome); })) throw new Error(nome + ' já está neste carrossel.');
     const maior = cx.fila.reduce(function (m, x) { return Math.max(m, numOrdem_(x)); }, 0);
@@ -919,6 +926,7 @@ function adicionarEquipeCarrossel(cartaoId) {
   const u = usuarioAtual_();
   return comTrava_(function () {
     const cx = contextoCarrossel_(u, cartaoId);
+    exigirCarrosselExistente_(cx);
     const ja = {};
     cx.fila.forEach(function (x) { ja[normalizar_(x.Pessoa)] = true; });
     const novos = ordenarNomes_(candidatosEscala_(cx.ctx.quadro)).filter(function (n) { return !ja[normalizar_(n)]; });
@@ -1114,9 +1122,12 @@ function salvarTarefaRotativa(listaId, dados) {
     };
     let r;
     if (existente) {
-      // Quem a pessoa escolheu como responsável desta semana vale mais que uma troca antiga; trocas de semanas futuras ficam.
+      // Se quem cuida desta semana pelo rodízio não mudou (editou só o texto, por exemplo), a troca desta semana continua.
+      // Se a pessoa escolheu outro responsável para esta semana, ele vale mais que a troca. Trocas de semanas futuras ficam.
       const t = trocasDe_(existente);
-      Object.keys(t).forEach(function (k) { if (k <= semana) delete t[k]; });
+      const rodizioAntes = responsavelDaSemana_(Object.assign({}, existente, { Trocas: '' }), semana).doRodizio;
+      const mesmoRodizio = normalizar_(pessoas[i0 === -1 ? 0 : i0]) === normalizar_(rodizioAntes);
+      Object.keys(t).forEach(function (k) { if (k < semana || (k === semana && !mesmoRodizio)) delete t[k]; });
       campos.Trocas = textoSeguro_(trocasParaTexto_(t));
       gravarCampos_(tr, existente, campos);
       r = existente;
@@ -1296,6 +1307,48 @@ function colocarNaVezLista(itemId) {
     const r = respostaFila_(cx.q, cx.tcr, cx.l.ID);
     registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Colocou ' + textoDe_(cx.p.Pessoa) + ' na vez');
     return r;
+  });
+}
+
+/**
+ * Zera a contagem de atendimentos. Com itemId, só daquela pessoa; sem, de toda a lista.
+ * A ordem da fila não muda. Devolve `antes` ({ id: atendimentos }) para a tela poder desfazer.
+ */
+function zerarAtendimentosLista(listaId, itemId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = contextoListaTipo_(u, listaId, 'Recorrente');
+    const tcr = lerTabela_('RECORRENTE');
+    const fila = filaDaLista_(tcr, cx.l.ID);
+    const alvos = itemId ? fila.filter(function (x) { return x.ID === String(itemId); }) : fila;
+    if (itemId && !alvos.length) throw new Error('Pessoa não encontrada na lista.');
+    const antes = {};
+    alvos.forEach(function (x) {
+      const n = numero_(x.Atendimentos);
+      if (!n) return;
+      antes[x.ID] = n;
+      gravarCampos_(tcr, x, { Atendimentos: 0 });
+    });
+    const quem = itemId ? textoDe_(alvos[0].Pessoa) : 'todos';
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Zerou os atendimentos de ' + quem);
+    return respostaFila_(cx.q, tcr, cx.l.ID, { antes: antes, zerados: Object.keys(antes).length });
+  });
+}
+
+/** Desfaz o "zerar": devolve as contagens guardadas em `valores` ({ id: atendimentos }). */
+function restaurarAtendimentosLista(listaId, valores) {
+  const u = usuarioAtual_();
+  valores = (valores && typeof valores === 'object') ? valores : {};
+  return comTrava_(function () {
+    const cx = contextoListaTipo_(u, listaId, 'Recorrente');
+    const tcr = lerTabela_('RECORRENTE');
+    filaDaLista_(tcr, cx.l.ID).forEach(function (x) {
+      if (!Object.prototype.hasOwnProperty.call(valores, x.ID)) return;
+      const n = Math.max(0, Math.min(1e6, Math.floor(numero_(valores[x.ID]))));
+      if (n !== numero_(x.Atendimentos)) gravarCampos_(tcr, x, { Atendimentos: n });
+    });
+    registrar_(u, 'Lista recorrente', 'Lista', cx.l.ID, cx.q.ID, 'Desfez o zerar atendimentos');
+    return respostaFila_(cx.q, tcr, cx.l.ID);
   });
 }
 
@@ -1516,6 +1569,29 @@ function salvarUsuario(dados) {
   });
 }
 
+/**
+ * Cor e ícone do avatar. Cada pessoa muda o próprio; ADM muda o de qualquer um.
+ * dados: { cor: '#RRGGBB' da paleta ou '' (automática), icone: um dos ícones ou '' (iniciais) }
+ */
+function salvarAvatar(email, dados) {
+  const u = usuarioAtual_();
+  dados = dados || {};
+  const alvo = String(email || u.email).trim().toLowerCase();
+  if (!igualEmail_(alvo, u.email) && u.perfil !== 'ADM') throw new Error('Você só pode mudar o seu próprio avatar.');
+  const cor = textoDe_(dados.cor) ? avatarCor_(dados.cor) : '';
+  if (textoDe_(dados.cor) && !cor) throw new Error('Escolha uma das cores da paleta.');
+  const icone = textoDe_(dados.icone) ? avatarIcone_(dados.icone) : '';
+  if (textoDe_(dados.icone) && !icone) throw new Error('Escolha um dos ícones da lista.');
+  return comTrava_(function () {
+    const tu = lerTabela_('USUARIOS');
+    const p = tu.linhas.filter(function (o) { return igualEmail_(o.Email, alvo); })[0];
+    if (!p) throw new Error('Pessoa não encontrada.');
+    gravarCampos_(tu, p, { Avatar_Cor: cor, Avatar_Icone: icone });
+    registrar_(u, 'Mudou avatar', 'Usuário', alvo, '', (icone || 'iniciais') + ' ' + (cor || 'cor automática'));
+    return { ok: true, ativos: usuariosAtivos_() };
+  });
+}
+
 function salvarConfig(pares) {
   const u = usuarioAtual_();
   exigirAdm_(u);
@@ -1564,16 +1640,25 @@ function salvarConfigEscala(quadroId, dados) {
     const equipe = unicos_((Array.isArray(dados.equipe) ? dados.equipe : separar_(dados.equipe))
       .map(function (n) { return textoLimpo_(n, 80); })
       .filter(function (n) { return n && permitidos.indexOf(normalizar_(n)) !== -1; }));
+
+    const frentes = {};
+    (Array.isArray(dados.frentes) ? dados.frentes : []).forEach(function (f) {
+      if (f && f.id) frentes[String(f.id)] = parseInt(f.vagas, 10) > 0 ? parseInt(f.vagas, 10) : '';
+    });
+    const tl = lerTabela_('LISTAS');
+    const podemSerFrente = tl.linhas.filter(function (l) { return l.Quadro_ID === q.ID && ativo_(l.Ativo) && listaAceitaCartoes_(l); });
+    if (dados.ativa !== false) {
+      if (!podemSerFrente.length) throw new Error('Este quadro não tem nenhuma lista normal para ser frente. Crie uma lista do tipo "Lista normal (cartões)" e tente de novo.');
+      if (!podemSerFrente.some(function (l) { return Object.prototype.hasOwnProperty.call(frentes, l.ID); })) {
+        throw new Error('Marque pelo menos uma lista como frente. A lista escolhida pode ter sido arquivada ou ser de rodízio; atualize a tela e confira.');
+      }
+      if (!equipe.length) throw new Error('Marque pelo menos uma pessoa na equipe do rodízio.');
+    }
     gravarCampos_(tq, q, {
       Escala_Ativa: dados.ativa === false ? 'Não' : 'Sim',
       Escala_Equipe: textoSeguro_(ordenarNomes_(equipe).join(', '))
     });
 
-    const frentes = {};
-    (dados.frentes || []).forEach(function (f) {
-      if (f && f.id) frentes[f.id] = parseInt(f.vagas, 10) > 0 ? parseInt(f.vagas, 10) : '';
-    });
-    const tl = lerTabela_('LISTAS');
     tl.linhas.filter(function (l) { return l.Quadro_ID === q.ID; }).forEach(function (l) {
       const eFrente = Object.prototype.hasOwnProperty.call(frentes, l.ID) && ativo_(l.Ativo) && listaAceitaCartoes_(l);
       gravarCampos_(tl, l, { Frente: eFrente ? 'Sim' : 'Não', Frente_Vagas: eFrente ? frentes[l.ID] : '' });
@@ -3604,8 +3689,23 @@ function resumoQuadros_(u) {
 function usuariosAtivos_() {
   return lerTabela_('USUARIOS').linhas
     .filter(function (o) { return textoDe_(o.Email) && ativo_(o.Ativo); })
-    .map(function (o) { return { email: textoDe_(o.Email).toLowerCase(), nome: textoDe_(o.Nome) || nomeDoEmail_(o.Email), perfil: perfilValido_(o.Perfil) }; })
+    .map(function (o) {
+      return {
+        email: textoDe_(o.Email).toLowerCase(), nome: textoDe_(o.Nome) || nomeDoEmail_(o.Email), perfil: perfilValido_(o.Perfil),
+        cor: avatarCor_(o.Avatar_Cor), icone: avatarIcone_(o.Avatar_Icone)
+      };
+    })
     .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+}
+
+function avatarCor_(v) {
+  const c = corValida_(v);
+  return AVATAR_CORES.indexOf(c) !== -1 ? c : '';
+}
+
+function avatarIcone_(v) {
+  const s = textoDe_(v);
+  return AVATAR_ICONES.indexOf(s) !== -1 ? s : '';
 }
 
 function listarUsuariosInterno_(u) {

@@ -11,8 +11,22 @@ ok(__sheets.Cartoes.d[0].includes('Carrossel_Total'), 'colunas Carrossel_Total/V
 const q = api.criarQuadro({ nome: 'Atendimento' }).quadro; const L = api.obterQuadro(q.id).listas[0].id;
 const c = api.criarCartao(L, 'Plantão de ligações').cartao;
 const ver = () => api.obterDetalheCartao(c.id).carrossel.map(x => x.pessoa);
-
-let r = api.adicionarParticipante(c.id, 'Ana Souza', 'ramal 2201');
+// Desde a 1.6.0 não se cria carrossel novo em cartão. Os carrosséis antigos (já gravados na aba) continuam funcionando.
+// legado() grava a primeira pessoa direto na aba, como um carrossel criado antes da 1.6.0.
+function legado(cartaoId, pessoa, texto) {
+  const cab = __sheets.Carrossel.d[0];
+  const row = cab.map(h => ({ Cartao_ID: cartaoId, Pessoa: pessoa, Texto: texto || '', Ordem: 1000, Atendimentos: 0, Ativo: 'Sim' })[h] ?? '');
+  __sheets.Carrossel.appendRow(row);
+  // o cartão antigo também tinha o resumo gravado (Carrossel_Total / Carrossel_Vez)
+  const cc = __sheets.Cartoes.d[0];
+  const linha = __sheets.Cartoes.d.find(r => r[cc.indexOf('ID')] === cartaoId);
+  linha[cc.indexOf('Carrossel_Total')] = 1; linha[cc.indexOf('Carrossel_Vez')] = pessoa;
+}
+ok(/Recorrente/.test(erro(() => api.adicionarParticipante(c.id, 'Ana Souza', 'ramal 2201')) || ''), 'cartão sem carrossel: não dá para criar carrossel novo (indica a lista Recorrente)');
+ok(/Recorrente/.test(erro(() => api.adicionarEquipeCarrossel(c.id)) || ''), 'cartão sem carrossel: "adicionar equipe" também não cria');
+ok(api.obterDetalheCartao(c.id).carrossel.length === 0, 'nada foi gravado na aba Carrossel');
+legado(c.id, 'Ana Souza', 'ramal 2201');
+let r;
 api.adicionarParticipante(c.id, 'Bruno Lima', 'ramal 2202'); api.adicionarParticipante(c.id, 'Carla Mendes', '');
 r = api.adicionarParticipante(c.id, 'Diego Alves', 'ramal 2204');
 ok(JSON.stringify(r.itens.map(x => x.pessoa)) === JSON.stringify(nomes.slice(0, 4)), 'ordem de entrada: ' + r.itens.map(x => x.pessoa));
@@ -43,7 +57,7 @@ const ult = r.itens[r.itens.length - 1]; const ordAntes = r.itens.map(x => x.pes
 r = api.passarVezCarrossel(ult.id);
 ok(r.itens.map(x => x.pessoa).join() === ordAntes && r.itens[r.itens.length - 1].atendimentos === ult.atendimentos + 1, 'quem já é o último: ordem igual, atendimento contado');
 // fila de 1 pessoa
-const c2 = api.criarCartao(L, 'Sozinho').cartao; const s1 = api.adicionarParticipante(c2.id, 'Ana Souza', 'x').itens[0];
+const c2 = api.criarCartao(L, 'Sozinho').cartao; legado(c2.id, 'Ana Souza', 'x'); const s1 = api.obterDetalheCartao(c2.id).carrossel[0];
 r = api.passarVezCarrossel(s1.id); ok(r.itens.length === 1 && r.resumo.vez === 'Ana Souza' && r.itens[0].atendimentos === 1, 'fila de 1 pessoa não quebra');
 // 200 voltas: ordem estável e números pequenos
 for (let i = 0; i < 200; i++) { const f = api.obterDetalheCartao(c.id).carrossel; api.passarVezCarrossel(f[0].id); }
@@ -58,18 +72,19 @@ r = api.removerParticipante(f[2].id);
 ok(r.itens.length === 3 && r.resumo.total === 3, 'remover tira da fila e atualiza o resumo');
 ok(__sheets.Carrossel.d.some(row => row[0] === f[2].id && row.includes('Não')), 'remover só marca Ativo=Não (nada é apagado)');
 // equipe inteira
-const c3 = api.criarCartao(L, 'Equipe').cartao;
+const c3 = api.criarCartao(L, 'Equipe').cartao; legado(c3.id, 'Ana Souza', '');
 r = api.adicionarEquipeCarrossel(c3.id);
-ok(r.adicionados === 4 && !r.itens.some(x => x.pessoa === 'Marina Reis'), 'equipe do quadro entra (4 pessoas, Leitor fica de fora)');
+ok(r.adicionados === 3 && r.itens.length === 4 && !r.itens.some(x => x.pessoa === 'Marina Reis'), 'carrossel antigo: equipe do quadro entra (mais 3, Leitor fica de fora)');
 ok(/já estão/.test(erro(() => api.adicionarEquipeCarrossel(c3.id))), 'repetir "adicionar equipe" avisa que todos já estão');
-// duplicar leva o carrossel com contagem zerada
+// duplicar NÃO leva o carrossel (era o selo "Vez" que aparecia por fora da cópia)
 const d = api.duplicarCartao(c.id);
 const fd = api.obterDetalheCartao(d.cartao.id).carrossel;
-ok(fd.length === 3 && fd.every(x => x.atendimentos === 0) && d.cartao.carrossel.total === 3, 'duplicar copia o carrossel com atendimentos zerados');
-ok(fd.map(x => x.pessoa).join() === api.obterDetalheCartao(c.id).carrossel.map(x => x.pessoa).join(), 'duplicar mantém a mesma ordem da fila');
+ok(fd.length === 0 && !d.cartao.carrossel, 'duplicar não copia o carrossel nem o selo "Vez" do cartão');
+ok(!api.obterQuadro(q.id).cartoes.find(x => x.id === d.cartao.id).carrossel, 'no quadro a cópia aparece sem o selo do carrossel');
+ok(api.obterDetalheCartao(c.id).carrossel.length === 3, 'o original continua com o carrossel dele');
 // limite
-const c4 = api.criarCartao(L, 'Lotado').cartao;
-for (let i = 0; i < 60; i++) api.adicionarParticipante(c4.id, 'Pessoa ' + i, '');
+const c4 = api.criarCartao(L, 'Lotado').cartao; legado(c4.id, 'Pessoa 0', '');
+for (let i = 1; i < 60; i++) api.adicionarParticipante(c4.id, 'Pessoa ' + i, '');
 ok(/até 60/.test(erro(() => api.adicionarParticipante(c4.id, 'Extra', ''))), 'limite de 60 participantes');
 // permissões
 __setEmail('marina.reis@t.com');

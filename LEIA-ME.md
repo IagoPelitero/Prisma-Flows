@@ -41,12 +41,17 @@ Rodízio semanal das pessoas entre as frentes (listas marcadas como frente). O c
 Ao criar uma lista, escolha o tipo:
 - **Normal:** recebe cartões.
 - **Rotatividade semanal:** tarefas que se repetem todo dia útil e mostram quem cuida delas nesta semana e na próxima. Os nomes giram a cada segunda na ordem escolhida, ou ficam fixos ("Manter o mesmo nome"). O nome pode ser trocado a qualquer hora, só para aquela semana.
-- **Recorrente:** fila de pessoas, cada uma com nome, texto e a caixa **Atendi**. Ao marcar, a pessoa vai para o fim da fila e o primeiro é o da vez. Tem Desfazer e Colocar na vez.
+- **Recorrente:** fila de pessoas, cada uma com nome, texto e a caixa **Atendi**. Ao marcar, a pessoa vai para o fim da fila e o primeiro é o da vez. Tem Desfazer e Colocar na vez. A contagem de atendimentos pode ser **zerada** (link "zerar" de cada pessoa, ou "Zerar atendimentos" para a lista toda), sem mudar a ordem da fila e com Desfazer.
 
 Listas de rodízio **não recebem cartões** e não aparecem como destino de cartão, de rotina ou de frente da escala. Todas as listas têm barra de rolagem quando ficam grandes.
 
-### Cartão Carrossel
-Dentro de um cartão: **Transformar em carrossel** cria uma fila de pessoas com a caixa **Atendi** (rodízio de ligações). O quadro mostra "Vez: Ana · 4" no cartão.
+**Altura da lista:** por padrão a lista cabe na tela. Arraste a **alça na borda de baixo** da lista para ela descer além da tela (o quadro ganha rolagem vertical) e ela continua rolando por dentro. Duplo clique na alça, ou "Voltar a altura ao tamanho da tela" no menu da lista, volta ao normal. A altura fica guardada no seu navegador.
+
+### Cartão Carrossel (descontinuado na 1.6.0)
+Não se cria mais carrossel em cartão: para rodízio de pessoas use uma **lista Recorrente**. Cartões que já tinham carrossel continuam funcionando, e **duplicar** um cartão não copia mais o carrossel.
+
+### Avatar
+Clique no seu nome no canto de cima para escolher a **cor** e um **ícone** (ou as iniciais). Todo mundo vê o mesmo avatar nos cartões, filas, escala e comentários. ADM muda o de qualquer pessoa pela Administração (clique no avatar da pessoa). Fica nas colunas `Avatar_Cor` e `Avatar_Icone` da aba `Usuarios`.
 
 ### Equipe
 Home e presencial por semana, escala mensal, banco de horas com aprovação, férias e folgas (ausências).
@@ -62,6 +67,15 @@ Home e presencial por semana, escala mensal, banco de horas com aprovação, fé
 Nada é apagado: arquivar só marca `Ativo = Não`.
 
 ## Histórico de versões
+
+### 1.6.0
+- **Lista recorrente:** zerar a contagem de atendimentos de uma pessoa ou da lista toda (com Desfazer).
+- **Altura das listas:** alça na borda de baixo para a lista descer além da tela, sem perder a rolagem de dentro.
+- **Correção:** depois de gravar (principalmente na rotatividade semanal e na recorrente) a lista não volta mais ao começo.
+- **Avatar:** cor e ícone escolhidos pela pessoa. Novas colunas `Avatar_Cor` e `Avatar_Icone` em `Usuarios`.
+- **Carrossel em cartão:** não se cria mais (use a lista Recorrente). Duplicar cartão não copia mais o carrossel, que aparecia por fora da cópia.
+- **Escala da semana:** a aba Configurar mostra as listas criadas depois de abrir o quadro (antes a frente "não existia"); mensagens dizem exatamente o que falta (frente, equipe ou lista normal); marcar frente ou pessoa liga "Usar a escala" sozinho (antes salvava desligada sem avisar).
+- **Correção:** editar uma tarefa da rotatividade semanal não transforma mais a troca da semana em mudança permanente do rodízio.
 
 ### 1.5.0
 - **Escala mensal** (1º horário, 2º horário ou Férias, dia a dia) no quadro (botão **Mensal**) e na tela Equipe (aba **Mensal**), com os mesmos dados. Nova aba `Mensal`.
