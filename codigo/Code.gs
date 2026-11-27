@@ -116,9 +116,16 @@ const CONFIG_PADRAO = [
 const PERFIS = ['ADM', 'Membro', 'Leitor'];
 const LIMITE_CARROSSEL = 60;
 /* Avatar: cor de fundo e ícone escolhidos pela pessoa. Ícone vazio = iniciais do nome. */
-const AVATAR_CORES = ['#5B4BC4', '#2F5BD3', '#16729F', '#0B7A75', '#1E7A58', '#4D7C0F', '#7D6200', '#B04E16', '#B23A48', '#A3236E', '#7A3FA0', '#56607A'];
-const AVATAR_ICONES = ['👒', '🏴‍☠️', '⚓', '🗺️', '🍖', '🍊', '⚔️', '🌊', '🔥', '⭐', '🌙', '☀️', '🌸', '🍀', '🐱', '🦊', '🐼', '🦁', '🐙', '🦈',
-  '🎧', '☕', '🚀', '💎', '🎯', '🎸', '📚', '🧠', '💡', '🏆'];
+const AVATAR_CORES = ['#5B4BC4', '#2F5BD3', '#16729F', '#0B7A75', '#1E7A58', '#4D7C0F', '#7D6200', '#B04E16', '#B23A48', '#A3236E', '#7A3FA0', '#56607A',
+  '#B7791F', '#C53030', '#4C51BF', '#D53F8C', '#8C6A4F'];
+/* Mesmos grupos do Script.html (GRUPOS_AVATAR). Divertidamente: emoji + cor de cada emoção. */
+const AVATAR_ICONES = [].concat(
+  ['😄', '😢', '😡', '😱', '🤢', '😬', '🤩', '🥱', '😳', '🥹'],
+  ['👒', '🏴‍☠️', '⚓', '🗺️', '🍖', '🍊', '⚔️', '🌊', '⛵', '🦈', '🐙', '💰'],
+  ['😀', '😂', '🤣', '😊', '😇', '🥰', '😎', '🤓', '🧐', '🤔', '🤗', '🤠', '🥳', '😴', '🤯', '🙃', '😉', '😜', '🤡', '👻', '👽', '🤖'],
+  ['🐱', '🦊', '🐼', '🦁', '🐶', '🐻', '🐨', '🐸', '🐵', '🦄', '🐝', '🦋', '🐢', '🐧'],
+  ['🔥', '⭐', '🌙', '☀️', '🌸', '🍀', '🌈', '✨', '🎧', '☕', '🚀', '💎', '🎯', '🎸', '📚', '🧠', '💡', '🏆', '❤️', '💪', '👍']
+);
 const TIPOS_LISTA = ['Normal', 'Rotativa', 'Recorrente'];
 const TURNOS_MENSAL = ['1º horário', '2º horário', 'Férias'];
 const TURNOS_ALMOCO_PADRAO = ['11:30', '12:00', '12:30', '13:00'];
@@ -1004,6 +1011,41 @@ function colocarNaVezCarrossel(participanteId) {
     const r = respostaCarrossel_(u, cx);
     registrar_(u, 'Carrossel', 'Cartão', cx.c.ID, cx.ctx.quadro.ID, 'Colocou ' + textoDe_(cx.p.Pessoa) + ' na vez');
     return r;
+  });
+}
+
+/** Zera os atendimentos do carrossel (antigo) de um cartão: de uma pessoa, ou de todos sem participanteId. A ordem não muda. */
+function zerarAtendimentosCarrossel(cartaoId, participanteId) {
+  const u = usuarioAtual_();
+  return comTrava_(function () {
+    const cx = contextoCarrossel_(u, cartaoId);
+    const alvos = participanteId ? cx.fila.filter(function (x) { return x.ID === String(participanteId); }) : cx.fila;
+    if (participanteId && !alvos.length) throw new Error('Participante não encontrado.');
+    const antes = {};
+    alvos.forEach(function (x) {
+      const n = numero_(x.Atendimentos);
+      if (!n) return;
+      antes[x.ID] = n;
+      gravarCampos_(cx.tcr, x, { Atendimentos: 0 });
+    });
+    registrar_(u, 'Carrossel', 'Cartão', cx.c.ID, cx.ctx.quadro.ID, 'Zerou os atendimentos de ' + (participanteId ? textoDe_(alvos[0].Pessoa) : 'todos'));
+    return respostaCarrossel_(u, cx, { antes: antes, zerados: Object.keys(antes).length });
+  });
+}
+
+/** Desfaz o "zerar" do carrossel: devolve as contagens guardadas ({ id: atendimentos }). */
+function restaurarAtendimentosCarrossel(cartaoId, valores) {
+  const u = usuarioAtual_();
+  valores = (valores && typeof valores === 'object') ? valores : {};
+  return comTrava_(function () {
+    const cx = contextoCarrossel_(u, cartaoId);
+    cx.fila.forEach(function (x) {
+      if (!Object.prototype.hasOwnProperty.call(valores, x.ID)) return;
+      const n = Math.max(0, Math.min(1e6, Math.floor(numero_(valores[x.ID]))));
+      if (n !== numero_(x.Atendimentos)) gravarCampos_(cx.tcr, x, { Atendimentos: n });
+    });
+    registrar_(u, 'Carrossel', 'Cartão', cx.c.ID, cx.ctx.quadro.ID, 'Desfez o zerar atendimentos');
+    return respostaCarrossel_(u, cx);
   });
 }
 

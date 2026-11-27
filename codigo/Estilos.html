@@ -816,11 +816,28 @@ button.cel.home:hover { background: var(--primaria); color: var(--sobre-primaria
 body.redimensionando, body.redimensionando * { cursor: ns-resize !important; user-select: none !important; }
 
 /* ---------- Lista recorrente: zerar atendimentos ---------- */
-.rec-zerar { font-size: 11.5px; font-weight: 600; margin-left: 4px; }
+.atend-n { font-weight: 700; color: var(--tinta-2); }
+.rec-zerar { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 8px 1px 6px; border: 1px solid var(--linha-forte); border-radius: 999px; background: var(--superficie); color: var(--primaria); font-size: 11.5px; font-weight: 650; line-height: 1.5; vertical-align: middle; }
+.rec-zerar:hover { border-color: var(--primaria); background: var(--primaria-suave); }
+.rec-zerar svg.ic { width: 12px; height: 12px; }
+.rec-pe-botoes .btn[disabled] { opacity: .45; }
 .rec-pe-botoes { display: flex; flex-wrap: wrap; gap: 4px; }
 
 /* ---------- Escala: avisos de configuração ---------- */
 .cfg-alerta { padding: 10px 12px; border-radius: 10px; background: var(--aviso-suave); color: var(--tinta); font-size: 13px; }
+
+/* ---------- Duplicar no próprio cartão do quadro ---------- */
+.cartao-dup {
+  position: absolute; top: 6px; right: 6px; z-index: 1; width: 28px; height: 28px; display: grid; place-items: center;
+  border: 1px solid var(--linha); border-radius: 7px; background: var(--superficie); color: var(--tinta-2);
+  opacity: 0; transition: opacity .12s;
+}
+.cartao-dup svg.ic { width: 15px; height: 15px; }
+.cartao:hover .cartao-dup, .cartao:focus-within .cartao-dup, .cartao-dup:focus-visible { opacity: 1; }
+.cartao-dup:hover { color: var(--primaria); border-color: var(--primaria); background: var(--primaria-suave); }
+.cartao.com-dup:hover .cartao-titulo, .cartao.com-dup:focus-within .cartao-titulo { padding-right: 30px; }
+@media (hover: none) { .cartao-dup { opacity: .85; } .cartao.com-dup .cartao-titulo { padding-right: 30px; } }
+.fantasma .cartao-dup { display: none; }
 
 /* ---------- Avatar: escolher cor e ícone ---------- */
 button.eu { border: 0; border-left: 1px solid var(--linha); background: transparent; color: inherit; border-radius: 0 10px 10px 0; padding: 4px 8px; text-align: left; }
@@ -839,6 +856,13 @@ button.eu:hover .avatar { transform: scale(1.08); }
 .av-cor { --av: #56607A; width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; background: var(--av); box-shadow: inset 0 0 0 2px var(--superficie); color: #fff; font-size: 12px; font-weight: 700; }
 .av-cor[aria-checked="true"] { border-color: var(--tinta); }
 .av-cor.auto { background: repeating-linear-gradient(45deg, var(--av), var(--av) 5px, color-mix(in srgb, var(--av) 70%, #fff) 5px, color-mix(in srgb, var(--av) 70%, #fff) 10px); }
+.av-emocoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+.av-emocao { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 6px; border: 1px solid var(--linha); border-radius: 12px; background: var(--superficie); font-size: 11.5px; font-weight: 650; color: var(--tinta-2); }
+.av-emocao .avatar { width: 36px; height: 36px; font-size: 22px; }
+.av-emocao:hover { border-color: var(--linha-forte); }
+.av-emocao[aria-pressed="true"] { border-color: var(--primaria); background: var(--primaria-suave); box-shadow: 0 0 0 1px var(--primaria); color: var(--tinta); }
+.av-grupo { display: block; margin: 10px 0 4px; font-size: 12px; font-weight: 650; color: var(--tinta-3); }
+.av-icones + .av-grupo { margin-top: 12px; }
 .av-icones { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
 .av-icone { height: 40px; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); font-size: 20px; line-height: 1; }
 .av-icone.ini { font-size: 13px; font-weight: 700; color: var(--tinta-2); }

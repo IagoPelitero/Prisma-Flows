@@ -49,6 +49,11 @@ ok(api.iniciar().usuarios.find(u => u.nome === 'Bruno Lima').icone === '👒', '
 ok(/próprio avatar/.test(erro(() => api.salvarAvatar('carla.mendes@t.com', { cor: '#0B7A75' })) || ''), 'Membro não muda o avatar dos outros');
 ok(/paleta/.test(erro(() => api.salvarAvatar('', { cor: '#123456' })) || ''), 'cor fora da paleta é recusada');
 ok(/ícones/.test(erro(() => api.salvarAvatar('', { icone: '=HYPERLINK("x")' })) || ''), 'ícone fora da lista é recusado (nada de fórmula)');
+for (const [ic, cor] of [['😄', '#B7791F'], ['😢', '#2F5BD3'], ['😡', '#C53030'], ['😱', '#7A3FA0'], ['🤢', '#4D7C0F'], ['😬', '#B04E16'], ['🤩', '#0B7A75'], ['🥱', '#4C51BF'], ['😳', '#D53F8C'], ['🥹', '#8C6A4F'], ['😂', ''], ['🦄', ''], ['⛵', '']]) {
+  const b2 = api.salvarAvatar('', { cor, icone: ic }).ativos.find(u => u.nome === 'Bruno Lima');
+  if (b2.icone !== ic || b2.cor !== cor) ok(false, 'avatar ' + ic + ' ' + cor + ' não foi aceito');
+}
+ok(true, 'as 10 emoções do Divertidamente (emoji + cor) e os emojis novos são aceitos');
 a = api.salvarAvatar('', { cor: '', icone: '' });
 bruno = a.ativos.find(u => u.nome === 'Bruno Lima');
 ok(bruno.cor === '' && bruno.icone === '', 'voltar para cor automática e iniciais');

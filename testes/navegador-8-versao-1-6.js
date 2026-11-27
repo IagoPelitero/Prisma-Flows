@@ -34,12 +34,14 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
 
   // ---------- 1. Zerar atendimentos ----------
   await passo('zerar atendimentos', async () => {
+    ok(await page.locator(rec + ' .rec-pe [data-acao="rec-zerar"]').isVisible() && await page.locator(rec + ' .rec-pe [data-acao="rec-zerar"]').isDisabled(), 'mesmo antes de alguém atender, o botão "Zerar atendimentos" já aparece (desabilitado)');
     for (let i = 0; i < 3; i++) {
       await page.click(rec + ' .car-item.na-vez input[type="checkbox"]');
       await page.waitForTimeout(700);
     }
     await page.waitForFunction(() => !document.querySelector('#avisos .aviso') || true);
     await page.waitForTimeout(1200);
+    ok(await page.locator(rec + ' .rec-pe [data-acao="rec-zerar"]').isEnabled(), 'depois dos atendimentos o botão "Zerar atendimentos" fica habilitado');
     const comAtend = () => page.locator(rec + ' .car-item small:has-text("1 atendimento")').count();
     ok(await comAtend() === 3, '3 pessoas com 1 atendimento depois de marcar Atendi');
     ok(await page.locator(rec + ' [data-acao="rec-zerar"][data-id]').count() === 3, 'cada pessoa com atendimento ganha o link "zerar"');
@@ -55,8 +57,9 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
     await page.waitForSelector('.modal button:has-text("Zerar")');
     ok((await page.locator('.modal').innerText()).includes('A ordem da fila continua a mesma'), 'zerar todos pede confirmação explicando que a ordem fica');
     await page.click('.modal button:has-text("Zerar")');
-    await page.waitForFunction(s => document.querySelectorAll(s + ' [data-acao="rec-zerar"]').length === 0, rec, { timeout: 8000 });
-    ok(await comAtend() === 0, 'zerar todos: ninguém com atendimento e o botão some');
+    await page.waitForFunction(s => document.querySelectorAll(s + ' [data-acao="rec-zerar"][data-id]').length === 0, rec, { timeout: 8000 });
+    ok(await comAtend() === 0, 'zerar todos: ninguém com atendimento');
+    ok(await page.locator(rec + ' .rec-pe [data-acao="rec-zerar"]').isDisabled(), 'o botão "Zerar atendimentos" continua à vista, só desabilitado');
     const conf = await rpc('obterQuadro', 'QD-0001');
     ok(conf.recorrentes[ids.rec].every(x => x.atendimentos === 0), 'gravado na planilha: todos com 0');
   });
@@ -138,6 +141,15 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
     ok(u.icone === '👒' && u.cor === '#B04E16', 'gravado na aba Usuarios');
     await abrirQuadro();
     ok(await page.locator('.avatar.com-icone[title="Ana Souza"]').count() > 0, 'o avatar aparece também no quadro (cartões e listas)');
+    // Divertidamente: escolher a emoção aplica o emoji e a cor dela
+    await page.click('button.eu'); await page.waitForSelector('#av-emocoes');
+    ok(await page.locator('.av-emocao').count() === 10, 'as 10 emoções do Divertidamente aparecem');
+    ok(await page.locator('.av-grupo').count() >= 4 && await page.locator('[data-av-icone="😂"]').count() === 1, 'grupos de emojis (One Piece, Carinhas, Bichos, Coisas)');
+    await page.click('.av-emocao[aria-label="Raiva"]');
+    ok((await page.locator('#av-previa .avatar').textContent()) === '😡' && (await page.$eval('#av-previa .avatar', el => el.getAttribute('style'))).includes('#C53030'), 'Raiva: 😡 em vermelho na prévia');
+    await page.click('.modal button[type="submit"]');
+    await page.waitForFunction(() => document.querySelector('button.eu .avatar').textContent === '😡');
+    ok((await rpc('iniciar')).usuarios.find(x => x.nome === 'Ana Souza').cor === '#C53030', 'emoção gravada (ícone e cor)');
     await page.click('button.eu'); await page.waitForSelector('#av-icones');
     await page.click('[data-av-icone=""]'); await page.click('[data-av-cor=""]');
     await page.click('.modal button[type="submit"]');
@@ -185,13 +197,11 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
   // ---------- 6. Cartão novo sem carrossel; cópia sem selo ----------
   await passo('sem carrossel novo', async () => {
     await abrirQuadro();
-    await page.click('.cartao:has-text("Cartão que já existia")');
-    await page.waitForSelector('#g-carrossel .car-item');
-    await page.click('[data-acao="duplicar-cartao"]');
+    const orig = page.locator('.cartao:has-text("Cartão que já existia")').first();
+    await orig.hover(); await orig.locator('.cartao-dup').click();
     await page.waitForSelector('.cartao:has-text("(cópia)")');
     ok(await page.locator('.cartao:has-text("Cartão que já existia (cópia)") .sinal.carrossel').count() === 0, 'a cópia de um cartão com carrossel não mostra o selo "Vez" por fora');
-    await page.keyboard.press('Escape');
-    await page.click('.cartao:has-text("(cópia)")');
+    await page.click('.cartao:has-text("(cópia)") .cartao-titulo');
     await page.waitForSelector('.gaveta');
     await page.waitForTimeout(1200);
     ok((await page.locator('#g-carrossel').innerHTML()) === '' && await page.locator('[data-acao="carrossel-iniciar"]').count() === 0, 'dentro da cópia não há carrossel nem botão para criar um');

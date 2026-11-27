@@ -82,6 +82,21 @@ const fd = api.obterDetalheCartao(d.cartao.id).carrossel;
 ok(fd.length === 0 && !d.cartao.carrossel, 'duplicar não copia o carrossel nem o selo "Vez" do cartão');
 ok(!api.obterQuadro(q.id).cartoes.find(x => x.id === d.cartao.id).carrossel, 'no quadro a cópia aparece sem o selo do carrossel');
 ok(api.obterDetalheCartao(c.id).carrossel.length === 3, 'o original continua com o carrossel dele');
+// zerar atendimentos do carrossel antigo (de uma pessoa e de todos), com desfazer
+{
+  let z = api.obterDetalheCartao(c.id).carrossel;
+  const comAtend = z.filter(x => x.atendimentos > 0);
+  const ordem = z.map(x => x.id).join();
+  const um = comAtend[0];
+  let rz = api.zerarAtendimentosCarrossel(c.id, um.id);
+  ok(rz.itens.find(x => x.id === um.id).atendimentos === 0 && rz.antes[um.id] === um.atendimentos && rz.itens.map(x => x.id).join() === ordem, 'carrossel: zerar uma pessoa (ordem igual)');
+  rz = api.restaurarAtendimentosCarrossel(c.id, rz.antes);
+  ok(rz.itens.find(x => x.id === um.id).atendimentos === um.atendimentos, 'carrossel: desfazer devolve a contagem');
+  rz = api.zerarAtendimentosCarrossel(c.id, '');
+  ok(rz.itens.every(x => x.atendimentos === 0) && rz.zerados === comAtend.length, 'carrossel: zerar todos');
+  ok(/não encontrado/i.test(erro(() => api.zerarAtendimentosCarrossel(c.id, 'CR-9999')) || ''), 'carrossel: zerar participante inexistente dá erro claro');
+  api.restaurarAtendimentosCarrossel(c.id, rz.antes);
+}
 // limite
 const c4 = api.criarCartao(L, 'Lotado').cartao; legado(c4.id, 'Pessoa 0', '');
 for (let i = 1; i < 60; i++) api.adicionarParticipante(c4.id, 'Pessoa ' + i, '');
@@ -90,6 +105,7 @@ ok(/até 60/.test(erro(() => api.adicionarParticipante(c4.id, 'Extra', ''))), 'l
 __setEmail('marina.reis@t.com');
 ok(/permiss/i.test(erro(() => api.passarVezCarrossel(f[0].id)) || ''), 'Leitor não consegue passar a vez');
 ok(/permiss/i.test(erro(() => api.adicionarParticipante(c.id, 'Fulano', '')) || ''), 'Leitor não consegue adicionar');
+ok(/permiss/i.test(erro(() => api.zerarAtendimentosCarrossel(c.id, '')) || ''), 'Leitor não consegue zerar');
 ok(api.obterDetalheCartao(c.id).carrossel.length === 3, 'Leitor consegue ver a fila');
 __setEmail('bruno.lima@t.com');
 ok(!erro(() => api.passarVezCarrossel(f[0].id)), 'Membro consegue passar a vez');

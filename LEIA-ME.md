@@ -27,7 +27,7 @@ Ao atualizar, **não é preciso trocar a planilha de dados**: ela se completa so
 ## O que o sistema faz
 
 ### Quadros e cartões
-Quadros com listas e cartões, responsáveis, prazo, prioridade, etiquetas, checklist, comentários e histórico. Arrastar e soltar, filtros, limite de cartões por lista, arquivar e restaurar, mover cartão para outro quadro, **duplicar cartão**, rotinas que criam cartões todo dia, semana ou mês, e atualização automática quando outra pessoa mexe no quadro.
+Quadros com listas e cartões, responsáveis, prazo, prioridade, etiquetas, checklist, comentários e histórico. Arrastar e soltar, filtros, limite de cartões por lista, arquivar e restaurar, mover cartão para outro quadro, **duplicar cartão** (ícone de copiar no próprio cartão do quadro, ao passar o mouse), rotinas que criam cartões todo dia, semana ou mês, e atualização automática quando outra pessoa mexe no quadro.
 
 ### Escala da semana e a vez
 Rodízio semanal das pessoas entre as frentes (listas marcadas como frente). O caso novo vai para quem está na vez, pulando ausentes. Na lista, o **lápis ao lado de "Na vez"** abre a escala da semana, onde **Colocar na vez** muda quem recebe o próximo caso.
@@ -41,7 +41,7 @@ Rodízio semanal das pessoas entre as frentes (listas marcadas como frente). O c
 Ao criar uma lista, escolha o tipo:
 - **Normal:** recebe cartões.
 - **Rotatividade semanal:** tarefas que se repetem todo dia útil e mostram quem cuida delas nesta semana e na próxima. Os nomes giram a cada segunda na ordem escolhida, ou ficam fixos ("Manter o mesmo nome"). O nome pode ser trocado a qualquer hora, só para aquela semana.
-- **Recorrente:** fila de pessoas, cada uma com nome, texto e a caixa **Atendi**. Ao marcar, a pessoa vai para o fim da fila e o primeiro é o da vez. Tem Desfazer e Colocar na vez. A contagem de atendimentos pode ser **zerada** (link "zerar" de cada pessoa, ou "Zerar atendimentos" para a lista toda), sem mudar a ordem da fila e com Desfazer.
+- **Recorrente:** fila de pessoas, cada uma com nome, texto e a caixa **Atendi**. Ao marcar, a pessoa vai para o fim da fila e o primeiro é o da vez. Tem Desfazer e Colocar na vez. A contagem de atendimentos pode ser **zerada** (botão **Zerar** ao lado da contagem de cada pessoa, ou **Zerar atendimentos** no rodapé e no menu da lista para todos), sem mudar a ordem da fila e com Desfazer.
 
 Listas de rodízio **não recebem cartões** e não aparecem como destino de cartão, de rotina ou de frente da escala. Todas as listas têm barra de rolagem quando ficam grandes.
 
@@ -51,7 +51,7 @@ Listas de rodízio **não recebem cartões** e não aparecem como destino de car
 Não se cria mais carrossel em cartão: para rodízio de pessoas use uma **lista Recorrente**. Cartões que já tinham carrossel continuam funcionando, e **duplicar** um cartão não copia mais o carrossel.
 
 ### Avatar
-Clique no seu nome no canto de cima para escolher a **cor** e um **ícone** (ou as iniciais). Todo mundo vê o mesmo avatar nos cartões, filas, escala e comentários. ADM muda o de qualquer pessoa pela Administração (clique no avatar da pessoa). Fica nas colunas `Avatar_Cor` e `Avatar_Icone` da aba `Usuarios`.
+Clique no seu nome no canto de cima para escolher a **cor** e um **ícone** (ou as iniciais). Tem as emoções do **Divertidamente** (Alegria, Tristeza, Raiva, Medo, Nojinho, Ansiedade, Inveja, Tédio, Vergonha e Nostalgia, cada uma com emoji e cor) e grupos de emojis: One Piece, Carinhas, Bichos e Coisas. Todo mundo vê o mesmo avatar nos cartões, filas, escala e comentários. ADM muda o de qualquer pessoa pela Administração (clique no avatar da pessoa). Fica nas colunas `Avatar_Cor` e `Avatar_Icone` da aba `Usuarios`.
 
 ### Equipe
 Home e presencial por semana, escala mensal, banco de horas com aprovação, férias e folgas (ausências).
@@ -67,6 +67,11 @@ Home e presencial por semana, escala mensal, banco de horas com aprovação, fé
 Nada é apagado: arquivar só marca `Ativo = Não`.
 
 ## Histórico de versões
+
+### 1.7.0
+- **Duplicar cartão** saiu do rodapé da gaveta e foi para o próprio cartão no quadro (ícone de copiar ao passar o mouse; no celular fica sempre à vista).
+- **Zerar atendimentos** mais à vista: botão Zerar ao lado da contagem de cada pessoa e botão no rodapé da lista sempre aparecendo. O carrossel antigo dos cartões também pode ser zerado.
+- **Avatar:** emoções do Divertidamente (emoji + cor) e mais emojis em grupos.
 
 ### 1.6.0
 - **Lista recorrente:** zerar a contagem de atendimentos de uma pessoa ou da lista toda (com Desfazer).

@@ -39,14 +39,20 @@ async function passo(nome, fn) { try { await fn(); } catch (e) { falhas++; conso
     await page.fill('#novo-cartao-texto', 'Ligar para o cliente 7781');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.cartao:has-text("Ligar para o cliente 7781"):not(.pendente)', { timeout: 8000 });
-    await page.click('.cartao:has-text("Ligar para o cliente 7781")');
-    await page.waitForSelector('.gaveta');
-    await page.click('[data-acao="duplicar-cartao"]');
+    // o botão de duplicar fica no próprio cartão do quadro (o resumo), não no rodapé da gaveta
+    const card = page.locator('.cartao:has-text("Ligar para o cliente 7781")');
+    await card.hover();
+    ok(await card.locator('.cartao-dup').isVisible(), 'passando o mouse no cartão aparece o botão de duplicar');
+    await card.locator('.cartao-dup').click();
     await page.waitForSelector('.cartao:has-text("(cópia)")', { timeout: 8000 });
+    ok(await page.locator('.gaveta').count() === 0, 'duplicar pelo cartão não abre a gaveta');
     ok(true, 'duplicar cria "(cópia)" na lista');
     const titulos = await page.locator('.lista >> nth=0').locator('.cartao-titulo').allTextContents();
     ok(titulos.join('|') === 'Ligar para o cliente 7781|Ligar para o cliente 7781 (cópia)', 'cópia fica logo abaixo: ' + titulos.join('|'));
     ok(await page.locator('.cartao:has-text("(cópia)") .sinal.carrossel').count() === 0, 'a cópia não ganha o selo "Vez" por fora do cartão');
+    await page.click('.cartao:has-text("(cópia)") .cartao-titulo');
+    await page.waitForSelector('.gaveta #g-pe .pe-acoes');
+    ok(await page.locator('#g-pe [data-acao="duplicar-cartao"]').count() === 0, 'o rodapé da gaveta não tem mais o botão de duplicar');
     ok(await page.locator('[data-acao="carrossel-iniciar"]').count() === 0 && (await page.locator('#g-carrossel').innerHTML()) === '', 'cartão novo não oferece mais "Transformar em carrossel"');
     await page.keyboard.press('Escape');
   });

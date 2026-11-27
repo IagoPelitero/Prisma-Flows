@@ -16,9 +16,22 @@
   var CORES_ETIQUETA = ['#2F9E44', '#E0A100', '#E8590C', '#D63939', '#7048E8', '#1C6ED4', '#0B8A8A', '#C2255C', '#5C677D'];
   var CORES_AVATAR = ['#5B4BC4', '#2F5BD3', '#16729F', '#1E7A58', '#7D6200', '#B04E16', '#B23A48', '#56607A'];
   /* Mesma paleta e mesmos ícones que o servidor aceita (Code.gs: AVATAR_CORES e AVATAR_ICONES). */
-  var PALETA_AVATAR = ['#5B4BC4', '#2F5BD3', '#16729F', '#0B7A75', '#1E7A58', '#4D7C0F', '#7D6200', '#B04E16', '#B23A48', '#A3236E', '#7A3FA0', '#56607A'];
-  var ICONES_AVATAR = ['👒', '🏴‍☠️', '⚓', '🗺️', '🍖', '🍊', '⚔️', '🌊', '🔥', '⭐', '🌙', '☀️', '🌸', '🍀', '🐱', '🦊', '🐼', '🦁', '🐙', '🦈',
-    '🎧', '☕', '🚀', '💎', '🎯', '🎸', '📚', '🧠', '💡', '🏆'];
+  var PALETA_AVATAR = ['#5B4BC4', '#2F5BD3', '#16729F', '#0B7A75', '#1E7A58', '#4D7C0F', '#7D6200', '#B04E16', '#B23A48', '#A3236E', '#7A3FA0', '#56607A',
+    '#B7791F', '#C53030', '#4C51BF', '#D53F8C', '#8C6A4F'];
+  /* Divertidamente: cada emoção é um emoji com a cor dela (escolher já aplica as duas coisas). */
+  var EMOCOES_AVATAR = [
+    { nome: 'Alegria', icone: '😄', cor: '#B7791F' }, { nome: 'Tristeza', icone: '😢', cor: '#2F5BD3' },
+    { nome: 'Raiva', icone: '😡', cor: '#C53030' }, { nome: 'Medo', icone: '😱', cor: '#7A3FA0' },
+    { nome: 'Nojinho', icone: '🤢', cor: '#4D7C0F' }, { nome: 'Ansiedade', icone: '😬', cor: '#B04E16' },
+    { nome: 'Inveja', icone: '🤩', cor: '#0B7A75' }, { nome: 'Tédio', icone: '🥱', cor: '#4C51BF' },
+    { nome: 'Vergonha', icone: '😳', cor: '#D53F8C' }, { nome: 'Nostalgia', icone: '🥹', cor: '#8C6A4F' }
+  ];
+  var GRUPOS_AVATAR = [
+    ['One Piece', ['👒', '🏴‍☠️', '⚓', '🗺️', '🍖', '🍊', '⚔️', '🌊', '⛵', '🦈', '🐙', '💰']],
+    ['Carinhas', ['😀', '😂', '🤣', '😊', '😇', '🥰', '😎', '🤓', '🧐', '🤔', '🤗', '🤠', '🥳', '😴', '🤯', '🙃', '😉', '😜', '🤡', '👻', '👽', '🤖']],
+    ['Bichos', ['🐱', '🦊', '🐼', '🦁', '🐶', '🐻', '🐨', '🐸', '🐵', '🦄', '🐝', '🦋', '🐢', '🐧']],
+    ['Coisas', ['🔥', '⭐', '🌙', '☀️', '🌸', '🍀', '🌈', '✨', '🎧', '☕', '🚀', '💎', '🎯', '🎸', '📚', '🧠', '💡', '🏆', '❤️', '💪', '👍']]
+  ];
   var ROTULOS_CONFIG = {
     NOME_SISTEMA: 'Nome do sistema',
     SUBTITULO: 'Subtítulo',
@@ -762,7 +775,9 @@
     if (c.carrossel) sinais.push('<span class="sinal carrossel" title="Carrossel: ' + esc(plural(c.carrossel.total, 'pessoa', 'pessoas')) + '. Na vez: ' + esc(c.carrossel.vez) + '">' + I.carrossel + '<span>Vez: <b>' + esc(primeiroNome(c.carrossel.vez)) + '</b> · ' + c.carrossel.total + '</span></span>');
     if (c.rotina) sinais.push('<span class="sinal" title="Criado por uma rotina">' + I.rotina + '<span class="so-leitor">Cartão de rotina</span></span>');
     var pessoas = c.responsaveis.length ? '<span class="avatares">' + c.responsaveis.slice(0, 4).map(function (n) { return avatar(n, true); }).join('') + '</span>' : '';
-    return '<article class="cartao' + (c.concluido ? ' concluido' : '') + (c.pendente ? ' pendente' : '') + '" data-id="' + esc(c.id) + '" data-acao="abrir-cartao" tabindex="0">' +
+    var dup = S.quadro && S.quadro.podeEditar && !c.pendente
+      ? '<button type="button" class="cartao-dup" data-acao="duplicar-cartao" data-id="' + esc(c.id) + '" title="Duplicar cartão" aria-label="Duplicar o cartão ' + esc(c.titulo) + '">' + I.copiar + '</button>' : '';
+    return '<article class="cartao' + (c.concluido ? ' concluido' : '') + (c.pendente ? ' pendente' : '') + (dup ? ' com-dup' : '') + '" data-id="' + esc(c.id) + '" data-acao="abrir-cartao" tabindex="0">' + dup +
       (etqs.length ? '<div class="cartao-etiquetas">' + etqs.map(function (e) { return etiquetaHtml(e); }).join('') + '</div>' : '') +
       '<h3 class="cartao-titulo">' + (c.concluido ? I.ok : '') + '<span>' + esc(c.titulo) + '</span></h3>' +
       (sinais.length || pessoas ? '<div class="cartao-rodape"><div class="sinais">' + sinais.join('') + '</div>' + pessoas + '</div>' : '') +
@@ -965,7 +980,7 @@
     if (!l) return;
     var itemAltura = alturaLista(id) ? [{ rotulo: 'Voltar a altura ao tamanho da tela', fn: function () { definirAltura(id, 0); renderListas(); } }] : [];
     if (l.tipo === 'Rotativa' || l.tipo === 'Recorrente') {
-      var temAtend = l.tipo === 'Recorrente' && filaRec(id).some(function (x) { return x.atendimentos > 0; });
+      var temAtend = l.tipo === 'Recorrente' && filaRec(id).length > 0;
       abrirMenu(botao, [
         { rotulo: 'Renomear lista', fn: function () { S.editandoLista = id; renderListas(); var inp = $('#lista-nome-' + id); if (inp) { inp.focus(); inp.select(); } } }
       ].concat(temAtend ? [{ rotulo: 'Zerar atendimentos de todos', fn: function () { recZerar(id, ''); } }] : [])
@@ -1245,8 +1260,7 @@
     if (c.criadoPor || c.criadoEm) meta.push('Criado' + (c.criadoPor ? ' por ' + esc(c.criadoPor) : '') + (c.criadoEm ? ', ' + esc(dataHora(c.criadoEm)) : ''));
     if (c.atualizadoEm && c.atualizadoEm !== c.criadoEm) meta.push('Última alteração' + (c.atualizadoPor ? ' de ' + esc(c.atualizadoPor) : '') + ', ' + esc(dataHora(c.atualizadoEm)));
     el.innerHTML = '<span>' + meta.join('<br>') + '</span>' +
-      (S.quadro.podeEditar ? '<span class="pe-acoes"><button type="button" class="btn pequeno" data-acao="duplicar-cartao">' + I.copiar + 'Duplicar cartão</button>' +
-        '<button type="button" class="btn pequeno" data-acao="mover-quadro">' + I.mover + 'Mover para outro quadro</button>' +
+      (S.quadro.podeEditar ? '<span class="pe-acoes"><button type="button" class="btn pequeno" data-acao="mover-quadro">' + I.mover + 'Mover para outro quadro</button>' +
         '<button type="button" class="btn perigo pequeno" data-acao="arquivar-cartao">' + I.caixa + 'Arquivar cartão</button></span>' : '');
   }
 
@@ -1379,7 +1393,8 @@
       html += '<p class="vez-agora">Na vez agora ' + avatar(itens[0].pessoa, true) + '<b>' + esc(itens[0].pessoa) + '</b>' + (itens[0].texto ? '<span class="texto-suave">' + esc(itens[0].texto) + '</span>' : '') + '</p>';
       html += '<ol class="car-lista">' + itens.map(function (i, n) {
         var pend = !!i.pendente;
-        var info = i.atendimentos ? plural(i.atendimentos, 'atendimento', 'atendimentos') + (i.ultimoEm ? ' · último ' + esc(dataHora(i.ultimoEm)) : '') : 'Ainda não atendeu';
+        var info = i.atendimentos ? '<span class="atend-n">' + plural(i.atendimentos, 'atendimento', 'atendimentos') + '</span>' + (i.ultimoEm ? ' · último ' + esc(dataHora(i.ultimoEm)) : '') : 'Ainda não atendeu';
+        if (i.atendimentos && ed && !pend) info += ' <button type="button" class="rec-zerar" data-acao="carrossel-zerar" data-id="' + esc(i.id) + '" title="Voltar a contagem de ' + esc(i.pessoa) + ' para zero" aria-label="Zerar os atendimentos de ' + esc(i.pessoa) + '">' + I.atualizar + 'Zerar</button>';
         return '<li class="car-item' + (n === 0 ? ' na-vez' : '') + '" data-car="' + esc(i.id) + '">' +
           '<label class="car-atendi" title="Marque quando atender: a pessoa vai para o fim da fila"><input type="checkbox" data-acao="carrossel-atendi" data-id="' + esc(i.id) + '"' + (ed && !pend ? '' : ' disabled') + ' aria-label="Atendi: ' + esc(i.pessoa) + '"><span>Atendi</span></label>' +
           '<span class="car-pos">' + (n + 1) + 'º</span>' +
@@ -1397,7 +1412,8 @@
         '<datalist id="car-sugestoes">' + S.usuarios.filter(function (u) { return jaNaFila.indexOf(norm(u.nome)) === -1; }).map(function (u) { return '<option value="' + esc(u.nome) + '"></option>'; }).join('') + '</datalist>' +
         '<input type="text" id="car-texto" placeholder="Texto (ex.: ramal, observação)" maxlength="300" aria-label="Texto da pessoa">' +
         '<button type="submit" class="btn">Adicionar</button></form>' +
-        '<button type="button" class="btn sutil pequeno" data-acao="carrossel-equipe">' + I.equipe + 'Adicionar toda a equipe do quadro</button>';
+        '<div class="rec-pe-botoes"><button type="button" class="btn sutil pequeno" data-acao="carrossel-equipe">' + I.equipe + 'Adicionar toda a equipe do quadro</button>' +
+        '<button type="button" class="btn sutil pequeno" data-acao="carrossel-zerar"' + (itens.some(function (i) { return i.atendimentos > 0 && !i.pendente; }) ? ' title="Volta a contagem de todos para zero. A ordem não muda."' : ' disabled title="Ninguém tem atendimento para zerar ainda."') + '>' + I.atualizar + 'Zerar atendimentos</button></div>';
     }
     el.innerHTML = html;
     // Quem está digitando o próximo nome não pode perder o texto quando a resposta do servidor redesenha a seção.
@@ -1484,6 +1500,32 @@
       aplicarCarrossel(id, r);
       aviso(plural(r.adicionados, 'pessoa entrou', 'pessoas entraram') + ' no carrossel.');
     }).catch(function (e) { aviso(msgErro(e), { erro: true }); });
+  }
+
+  /** Zera os atendimentos do carrossel do cartão aberto: de uma pessoa (itemId) ou de todos. A ordem não muda. */
+  function carrosselZerar(itemId) {
+    var id = S.cartaoAberto;
+    var itens = (S.detalhe && S.detalhe.carrossel) || [];
+    var alvos = itens.filter(function (x) { return (!itemId || x.id === itemId) && x.atendimentos > 0 && !x.pendente; });
+    if (!id || !alvos.length) { aviso('Ninguém tem atendimento para zerar.'); return; }
+    var pergunta = itemId ? Promise.resolve(true) : confirmarAcao({
+      titulo: 'Zerar os atendimentos de todos?',
+      texto: plural(alvos.length, 'pessoa volta', 'pessoas voltam') + ' para 0 atendimentos. A ordem do carrossel continua a mesma. Dá para desfazer logo depois.',
+      confirmar: 'Zerar'
+    });
+    pergunta.then(function (ok) {
+      if (!ok) return;
+      var antes = {};
+      alvos.forEach(function (x) { antes[x.id] = x.atendimentos; x.atendimentos = 0; });
+      renderSecaoCarrossel();
+      escrever('zerarAtendimentosCarrossel', id, itemId || '').then(function (r) {
+        sincronizarCarrossel(id, r);
+        var valores = r.antes || antes;
+        aviso(itemId ? 'Atendimentos de ' + alvos[0].pessoa + ' zerados.' : 'Atendimentos do carrossel zerados.', { acao: { rotulo: 'Desfazer', fn: function () {
+          escrever('restaurarAtendimentosCarrossel', id, valores).then(function (r2) { sincronizarCarrossel(id, r2); }).catch(falhouCarrossel(id));
+        } } });
+      }).catch(falhouCarrossel(id));
+    });
   }
 
   function carrosselNaVez(itemId) {
@@ -1689,8 +1731,8 @@
       ? '<p class="vez-agora">Na vez agora ' + avatar(itens[0].pessoa, true) + '<b>' + esc(itens[0].pessoa) + '</b>' + (itens[0].texto ? '<span class="texto-suave">' + esc(itens[0].texto) + '</span>' : '') + '</p>' +
         '<ol class="car-lista">' + itens.map(function (i, n) {
           var pend = !!i.pendente;
-          var info = i.atendimentos ? plural(i.atendimentos, 'atendimento', 'atendimentos') : 'Ainda não atendeu';
-          if (i.atendimentos && ed && !pend) info += ' <button type="button" class="link-texto rec-zerar" data-acao="rec-zerar" data-lista="' + lid + '" data-id="' + esc(i.id) + '" title="Voltar a contagem de ' + esc(i.pessoa) + ' para zero" aria-label="Zerar os atendimentos de ' + esc(i.pessoa) + '">zerar</button>';
+          var info = i.atendimentos ? '<span class="atend-n">' + plural(i.atendimentos, 'atendimento', 'atendimentos') + '</span>' : 'Ainda não atendeu';
+          if (i.atendimentos && ed && !pend) info += ' <button type="button" class="rec-zerar" data-acao="rec-zerar" data-lista="' + lid + '" data-id="' + esc(i.id) + '" title="Voltar a contagem de ' + esc(i.pessoa) + ' para zero" aria-label="Zerar os atendimentos de ' + esc(i.pessoa) + '">' + I.atualizar + 'Zerar</button>';
           return '<li class="car-item' + (n === 0 ? ' na-vez' : '') + '">' +
             '<label class="car-atendi" title="Marque quando atender: a pessoa vai para o fim da fila"><input type="checkbox" data-acao="rec-atendi" data-lista="' + lid + '" data-id="' + esc(i.id) + '"' + (ed && !pend ? '' : ' disabled') + ' aria-label="Atendi: ' + esc(i.pessoa) + '"><span>Atendi</span></label>' +
             '<span class="car-pos">' + (n + 1) + 'º</span>' +
@@ -1708,7 +1750,9 @@
         '<input type="text" id="rec-texto-' + lid + '" data-rec-rascunho="texto:' + lid + '" placeholder="Texto (ex.: ramal)" maxlength="300" value="' + esc(S.rascunhoRec['texto:' + l.id] || '') + '" aria-label="Texto da pessoa">' +
         '<button type="submit" class="btn">Adicionar</button></form>' +
         '<div class="rec-pe-botoes"><button type="button" class="btn sutil pequeno" data-acao="rec-equipe" data-lista="' + lid + '">' + I.equipe + 'Adicionar toda a equipe</button>' +
-        (itens.some(function (i) { return i.atendimentos > 0 && !i.pendente; }) ? '<button type="button" class="btn sutil pequeno" data-acao="rec-zerar" data-lista="' + lid + '" title="Volta a contagem de atendimentos de todos para zero. A ordem da fila não muda.">' + I.atualizar + 'Zerar atendimentos</button>' : '') + '</div>'
+        (itens.length ? '<button type="button" class="btn sutil pequeno" data-acao="rec-zerar" data-lista="' + lid + '"' +
+          (itens.some(function (i) { return i.atendimentos > 0 && !i.pendente; }) ? ' title="Volta a contagem de atendimentos de todos para zero. A ordem da fila não muda."' : ' disabled title="Ninguém tem atendimento para zerar ainda."') +
+          '>' + I.atualizar + 'Zerar atendimentos</button>' : '') + '</div>'
       : '';
     return '<div class="rec-corpo">' + lista + '</div>' + (form ? '<div class="lista-pe rec-pe">' + form + '</div>' : '');
   }
@@ -1717,7 +1761,7 @@
   function recZerar(listaId, itemId) {
     var itens = filaRec(listaId);
     var alvos = itens.filter(function (x) { return (!itemId || x.id === itemId) && x.atendimentos > 0 && !x.pendente; });
-    if (!alvos.length) return;
+    if (!alvos.length) { aviso('Ninguém tem atendimento para zerar.'); return; }
     var uma = !!itemId;
     var pergunta = uma ? Promise.resolve(true) : confirmarAcao({
       titulo: 'Zerar os atendimentos de todos?',
@@ -3761,7 +3805,8 @@
       '<p>Aparece nos cartões, nas filas, na escala e nos comentários. Todo mundo vê o mesmo.</p></div>' +
       '<div class="modal-corpo"><div class="av-previa" id="av-previa"></div>' +
       '<div class="campo"><span class="rotulo">Cor</span><div class="av-cores" role="radiogroup" aria-label="Cor do avatar" id="av-cores"></div></div>' +
-      '<div class="campo"><span class="rotulo">Ícone</span><div class="av-icones" role="radiogroup" aria-label="Ícone do avatar" id="av-icones"></div></div>' +
+      '<div class="campo"><span class="rotulo">Divertidamente</span><span class="ajuda">Escolha uma emoção: o emoji e a cor dela entram juntos.</span><div class="av-emocoes" id="av-emocoes"></div></div>' +
+      '<div class="campo"><span class="rotulo">Ícone</span><div id="av-icones"></div></div>' +
       '</div><div class="modal-rodape"><div class="direita"><button type="button" class="btn sutil" data-acao="fechar-modal">Cancelar</button><button type="submit" class="btn primario">Salvar avatar</button></div></div></form>');
     function desenhar() {
       var auto = CORES_AVATAR[hash(norm(p.nome)) % CORES_AVATAR.length];
@@ -3769,13 +3814,23 @@
       $('#av-previa').innerHTML = htmlAvatar(p.nome, false, cor, escolha.icone) + '<span><b>' + esc(p.nome) + '</b><small>' + (escolha.icone ? 'Ícone ' + esc(escolha.icone) : 'Iniciais do nome') + ' · ' + (escolha.cor ? 'cor escolhida' : 'cor automática') + '</small></span>';
       $('#av-cores').innerHTML = '<button type="button" class="av-cor auto" data-av-cor="" role="radio" aria-checked="' + !escolha.cor + '" title="Automática" aria-label="Cor automática" style="--av:' + auto + '">A</button>' +
         PALETA_AVATAR.map(function (c) { return '<button type="button" class="av-cor" data-av-cor="' + c + '" role="radio" aria-checked="' + (escolha.cor === c) + '" aria-label="Cor ' + c + '" style="--av:' + c + '"></button>'; }).join('');
-      $('#av-icones').innerHTML = '<button type="button" class="av-icone ini" data-av-icone="" role="radio" aria-checked="' + !escolha.icone + '" title="Iniciais do nome" aria-label="Iniciais do nome">' + esc(iniciais(p.nome)) + '</button>' +
-        ICONES_AVATAR.map(function (i) { return '<button type="button" class="av-icone" data-av-icone="' + esc(i) + '" role="radio" aria-checked="' + (escolha.icone === i) + '" aria-label="Ícone ' + esc(i) + '">' + esc(i) + '</button>'; }).join('');
+      $('#av-emocoes').innerHTML = EMOCOES_AVATAR.map(function (e) {
+        var marcada = escolha.icone === e.icone && escolha.cor === e.cor;
+        return '<button type="button" class="av-emocao" data-av-emocao="' + esc(e.icone) + '" data-av-emocao-cor="' + e.cor + '" aria-pressed="' + marcada + '" aria-label="' + esc(e.nome) + '" title="' + esc(e.nome) + '">' +
+          htmlAvatar(e.nome, false, e.cor, e.icone) + '<span>' + esc(e.nome) + '</span></button>';
+      }).join('');
+      var botao = function (i) { return '<button type="button" class="av-icone" data-av-icone="' + esc(i) + '" role="radio" aria-checked="' + (escolha.icone === i) + '" aria-label="Ícone ' + esc(i) + '">' + esc(i) + '</button>'; };
+      $('#av-icones').innerHTML = '<div class="av-icones" role="radiogroup" aria-label="Iniciais"><button type="button" class="av-icone ini" data-av-icone="" role="radio" aria-checked="' + !escolha.icone + '" title="Iniciais do nome" aria-label="Iniciais do nome">' + esc(iniciais(p.nome)) + '</button></div>' +
+        GRUPOS_AVATAR.map(function (g) {
+          return '<span class="av-grupo">' + esc(g[0]) + '</span><div class="av-icones" role="radiogroup" aria-label="' + esc(g[0]) + '">' + g[1].map(botao).join('') + '</div>';
+        }).join('');
     }
     desenhar();
     m.addEventListener('click', function (ev) {
       var c = ev.target.closest('[data-av-cor]');
       var i = ev.target.closest('[data-av-icone]');
+      var em = ev.target.closest('[data-av-emocao]');
+      if (em) { escolha.icone = em.getAttribute('data-av-emocao'); escolha.cor = em.getAttribute('data-av-emocao-cor'); desenhar(); return; }
       if (c) { escolha.cor = c.getAttribute('data-av-cor'); desenhar(); }
       if (i) { escolha.icone = i.getAttribute('data-av-icone'); desenhar(); }
     });
@@ -4107,7 +4162,7 @@
     'fechar-gaveta': function () { fecharGaveta(); },
     'fechar-modal': function () { fecharModal(); },
     'arquivar-cartao': function () { arquivarCartao(S.cartaoAberto); },
-    'duplicar-cartao': function () { duplicarCartao(S.cartaoAberto); },
+    'duplicar-cartao': function (el) { duplicarCartao(el.getAttribute('data-id') || S.cartaoAberto); },
     'editar-vez': function () { abrirModalEscala('semana'); },
     'rot-semana': function (el) { (S.rotSemana = S.rotSemana || {})[el.getAttribute('data-lista')] = el.getAttribute('data-valor'); renderListas(); },
     'rot-nova': function (el) { modalTarefaRot(el.getAttribute('data-lista'), ''); },
@@ -4130,6 +4185,7 @@
     'carrossel-editar': function (el) { carrosselEditar(el.getAttribute('data-id')); },
     'carrossel-remover': function (el) { carrosselRemover(el.getAttribute('data-id')); },
     'carrossel-equipe': function () { carrosselEquipe(); },
+    'carrossel-zerar': function (el) { carrosselZerar(el.getAttribute('data-id') || ''); },
     'remover-resp': function (el) {
       var c = cartao(S.cartaoAberto);
       var nome = el.getAttribute('data-nome');
